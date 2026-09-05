@@ -5,14 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "DATABASE_URL=\"file:./dev.db\" prisma generate && next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "lint": "next lint",
     "forms:gen": "tsx scripts/generate-mock-forms.ts",
-    "db:push": "prisma db push",
-    "db:generate": "prisma generate",
-    "postinstall": "prisma generate"
+    "db:push": "DATABASE_URL=\"file:./dev.db\" prisma db push",
+    "db:generate": "DATABASE_URL=\"file:./dev.db\" prisma generate",
+    "postinstall": "DATABASE_URL=\"file:./dev.db\" prisma generate"
   },
   "dependencies": {
     "@tax-form-layer/engine": "workspace:*",

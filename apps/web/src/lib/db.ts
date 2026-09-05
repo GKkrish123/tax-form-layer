@@ -1,12 +1,65 @@
 import { PrismaClient } from '@prisma/client';
 
-// Reuse a single PrismaClient across hot reloads in dev to avoid exhausting
-// connections. The rest of the app talks to the small repository API below rather
-// than to Prisma directly, so the storage engine can be swapped in one place.
-const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+function configureDatabaseUrl(): void {
+  if (process.env.VERCEL) {
+    process.env.DATABASE_URL = 'file:/tmp/tax-form-layer.db';
+    return;
+  }
+  if (!process.env.DATABASE_URL) {
+    process.env.DATABASE_URL = 'file:./dev.db';
+  }
+}
+
+configureDatabaseUrl();
+
+const globalForPrisma = globalThis as unknown as {
+  prisma?: PrismaClient;
+  prismaReady?: Promise<void>;
+};
 
 export const prisma = globalForPrisma.prisma ?? new PrismaClient();
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+
+async function ensureSchema(): Promise<void> {
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "Template" (
+      "id" TEXT NOT NULL PRIMARY KEY,
+      "slug" TEXT NOT NULL,
+      "title" TEXT NOT NULL,
+      "latest" INTEGER NOT NULL DEFAULT 1,
+      "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" DATETIME NOT NULL
+    )
+  `);
+  await prisma.$executeRawUnsafe(
+    `CREATE UNIQUE INDEX IF NOT EXISTS "Template_slug_key" ON "Template"("slug")`,
+  );
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "TemplateVersion" (
+      "id" TEXT NOT NULL PRIMARY KEY,
+      "templateId" TEXT NOT NULL,
+      "version" INTEGER NOT NULL,
+      "specVersion" TEXT NOT NULL,
+      "document" TEXT NOT NULL,
+      "message" TEXT,
+      "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "TemplateVersion_templateId_fkey"
+        FOREIGN KEY ("templateId") REFERENCES "Template" ("id")
+        ON DELETE CASCADE ON UPDATE CASCADE
+    )
+  `);
+  await prisma.$executeRawUnsafe(
+    `CREATE UNIQUE INDEX IF NOT EXISTS "TemplateVersion_templateId_version_key"
+     ON "TemplateVersion"("templateId", "version")`,
+  );
+}
+
+function ready(): Promise<void> {
+  if (!globalForPrisma.prismaReady) {
+    globalForPrisma.prismaReady = ensureSchema();
+  }
+  return globalForPrisma.prismaReady;
+}
 
 export interface StoredVersion {
   version: number;
@@ -29,6 +82,7 @@ export async function saveTemplateVersion(input: {
   document: unknown;
   message?: string;
 }): Promise<{ template: StoredTemplate; version: number }> {
+  await ready();
   const documentText = JSON.stringify(input.document);
 
   const existing = await prisma.template.findUnique({ where: { slug: input.slug } });
@@ -84,11 +138,13 @@ export async function saveTemplateVersion(input: {
 }
 
 export async function listTemplates(): Promise<StoredTemplate[]> {
+  await ready();
   const rows = await prisma.template.findMany({ orderBy: { updatedAt: 'desc' } });
   return rows.map((r) => ({ id: r.id, slug: r.slug, title: r.title, latest: r.latest }));
 }
 
 export async function listVersions(slug: string): Promise<StoredVersion[]> {
+  await ready();
   const template = await prisma.template.findUnique({
     where: { slug },
     include: { versions: { orderBy: { version: 'desc' } } },
@@ -103,6 +159,7 @@ export async function listVersions(slug: string): Promise<StoredVersion[]> {
 }
 
 export async function getTemplateDocument(slug: string, version?: number): Promise<unknown | null> {
+  await ready();
   const template = await prisma.template.findUnique({
     where: { slug },
     include: {
