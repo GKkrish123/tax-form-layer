@@ -1,0 +1,35 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Template {
+  id        String   @id @default(cuid())
+  /// Stable slug, e.g. "irs-w2-2024".
+  slug      String   @unique
+  title     String
+  latest    Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  versions TemplateVersion[]
+}
+
+model TemplateVersion {
+  id          String   @id @default(cuid())
+  templateId  String
+  version     Int
+  specVersion String
+  /// Full FormTemplate JSON.
+  document    String
+  message     String?
+  createdAt   DateTime @default(now())
+
+  template Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, version])
+}

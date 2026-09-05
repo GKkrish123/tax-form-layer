@@ -1,0 +1,190 @@
+{
+  "specVersion": "1.0.0",
+  "id": "irs-w2-2024",
+  "title": "IRS Form W-2 (2024) — Wage and Tax Statement",
+  "templateVersion": "1.0.0",
+  "form": {
+    "jurisdiction": "US-IRS",
+    "formNumber": "W-2",
+    "taxYear": 2024,
+    "edition": "2024"
+  },
+  "medium": {
+    "kind": "pdf",
+    "dpi": 150
+  },
+  "pageSize": { "width": 612, "height": 792 },
+  "metadata": {
+    "author": "tax-form-layer",
+    "description": "Reference annotation demonstrating value, currency, ssn/ein, checkbox, comb, and repeating-group fields.",
+    "tags": ["w2", "wages", "reference"]
+  },
+  "pages": [
+    {
+      "number": 1,
+      "backgroundRef": 0,
+      "fields": [
+        {
+          "type": "value",
+          "id": "employee_ssn",
+          "label": "Box a — Employee's SSN",
+          "boxNumber": "a",
+          "rect": { "x": 0.05, "y": 0.06, "width": 0.32, "height": 0.03 },
+          "binding": { "source": "jsonpath", "path": "$.employee.ssn" },
+          "format": { "type": "ssn" },
+          "style": { "fontSize": 10, "align": "left" }
+        },
+        {
+          "type": "value",
+          "id": "employer_ein",
+          "label": "Box b — Employer EIN",
+          "boxNumber": "b",
+          "rect": { "x": 0.05, "y": 0.12, "width": 0.32, "height": 0.03 },
+          "binding": { "source": "jsonpath", "path": "$.employer.ein" },
+          "format": { "type": "ein" },
+          "style": { "fontSize": 10 }
+        },
+        {
+          "type": "value",
+          "id": "employer_block",
+          "label": "Box c — Employer name & address",
+          "boxNumber": "c",
+          "rect": { "x": 0.05, "y": 0.17, "width": 0.4, "height": 0.09 },
+          "binding": {
+            "source": "template",
+            "template": "{$.employer.name}\n{$.employer.address.street}\n{$.employer.address.city}, {$.employer.address.state} {$.employer.address.zip}"
+          },
+          "format": { "type": "text" },
+          "style": { "fontSize": 9, "verticalAlign": "top", "overflow": "wrap" }
+        },
+        {
+          "type": "value",
+          "id": "employee_name",
+          "label": "Box e — Employee name",
+          "boxNumber": "e",
+          "rect": { "x": 0.05, "y": 0.3, "width": 0.4, "height": 0.03 },
+          "binding": {
+            "source": "template",
+            "template": "{$.employee.firstName} {$.employee.lastName}"
+          },
+          "format": { "type": "text", "case": "upper" },
+          "style": { "fontSize": 10 }
+        },
+        {
+          "type": "value",
+          "id": "box1_wages",
+          "label": "Box 1 — Wages, tips, other comp.",
+          "boxNumber": "1",
+          "rect": { "x": 0.5, "y": 0.06, "width": 0.22, "height": 0.03 },
+          "binding": { "source": "jsonpath", "path": "$.boxes.box1", "fallback": 0 },
+          "format": { "type": "currency" },
+          "style": { "align": "right", "fontSize": 10 }
+        },
+        {
+          "type": "value",
+          "id": "box2_fed_withheld",
+          "label": "Box 2 — Federal income tax withheld",
+          "boxNumber": "2",
+          "rect": { "x": 0.75, "y": 0.06, "width": 0.22, "height": 0.03 },
+          "binding": { "source": "jsonpath", "path": "$.boxes.box2", "fallback": 0 },
+          "format": { "type": "currency" },
+          "style": { "align": "right", "fontSize": 10 }
+        },
+        {
+          "type": "value",
+          "id": "box3_ss_wages",
+          "label": "Box 3 — Social security wages",
+          "boxNumber": "3",
+          "rect": { "x": 0.5, "y": 0.12, "width": 0.22, "height": 0.03 },
+          "binding": { "source": "jsonpath", "path": "$.boxes.box3", "fallback": 0 },
+          "format": { "type": "currency" },
+          "style": { "align": "right", "fontSize": 10 }
+        },
+        {
+          "type": "value",
+          "id": "box4_ss_withheld",
+          "label": "Box 4 — Social security tax withheld",
+          "boxNumber": "4",
+          "rect": { "x": 0.75, "y": 0.12, "width": 0.22, "height": 0.03 },
+          "binding": { "source": "jsonpath", "path": "$.boxes.box4", "fallback": 0 },
+          "format": { "type": "currency" },
+          "style": { "align": "right", "fontSize": 10 }
+        },
+        {
+          "type": "checkbox",
+          "id": "box13_retirement",
+          "label": "Box 13 — Retirement plan",
+          "boxNumber": "13",
+          "rect": { "x": 0.5, "y": 0.3, "width": 0.02, "height": 0.02 },
+          "binding": { "source": "jsonpath", "path": "$.boxes.box13.retirementPlan" },
+          "mark": "cross"
+        },
+        {
+          "type": "repeat",
+          "id": "state_rows",
+          "label": "Boxes 15-17 — State tax (repeating)",
+          "rect": { "x": 0.05, "y": 0.85, "width": 0.9, "height": 0.03 },
+          "itemsPath": "$.state",
+          "rowHeight": 0.035,
+          "maxRows": 2,
+          "fields": [
+            {
+              "type": "value",
+              "id": "state_code",
+              "boxNumber": "15",
+              "rect": { "x": 0, "y": 0, "width": 0.08, "height": 0.03 },
+              "binding": { "source": "jsonpath", "path": "@.code" },
+              "format": { "type": "text", "case": "upper" }
+            },
+            {
+              "type": "value",
+              "id": "state_wages",
+              "boxNumber": "16",
+              "rect": { "x": 0.3, "y": 0, "width": 0.25, "height": 0.03 },
+              "binding": { "source": "jsonpath", "path": "@.wages", "fallback": 0 },
+              "format": { "type": "currency" },
+              "style": { "align": "right" }
+            },
+            {
+              "type": "value",
+              "id": "state_tax",
+              "boxNumber": "17",
+              "rect": { "x": 0.6, "y": 0, "width": 0.25, "height": 0.03 },
+              "binding": { "source": "jsonpath", "path": "@.tax", "fallback": 0 },
+              "format": { "type": "currency" },
+              "style": { "align": "right" }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "sampleData": {
+    "employee": {
+      "firstName": "Jordan",
+      "lastName": "Rivera",
+      "ssn": "123456789"
+    },
+    "employer": {
+      "name": "Acme Robotics, Inc.",
+      "ein": "981234567",
+      "address": {
+        "street": "500 Innovation Way",
+        "city": "Palo Alto",
+        "state": "CA",
+        "zip": "94304"
+      }
+    },
+    "boxes": {
+      "box1": 84250.75,
+      "box2": 12630.11,
+      "box3": 84250.75,
+      "box4": 5223.55,
+      "box13": { "retirementPlan": true }
+    },
+    "state": [
+      { "code": "CA", "wages": 84250.75, "tax": 4102.33 },
+      { "code": "NY", "wages": 0, "tax": 0 }
+    ]
+  }
+}
