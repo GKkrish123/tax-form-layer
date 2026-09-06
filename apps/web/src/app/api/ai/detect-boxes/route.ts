@@ -4,6 +4,7 @@ import { chatJSON, isConfigured } from '@/lib/ai/provider';
 import { guessAlign, guessFormat } from '@/lib/ai/heuristics';
 
 export const runtime = 'nodejs';
+export const maxDuration = 60;
 
 interface Body {
   imageDataUrl: string;

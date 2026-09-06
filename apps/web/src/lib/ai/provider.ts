@@ -174,9 +174,12 @@ export async function chat(messages: ChatMessage[], opts: ChatOptions = {}): Pro
   let lastError: unknown;
   for (const model of candidates) {
     try {
-      return await callModel(model, messages, opts);
+      const result = await callModel(model, messages, opts);
+      console.log(`[ai] model responded: ${model}`);
+      return result;
     } catch (err) {
       lastError = err;
+      console.warn(`[ai] model failed: ${model}`, err instanceof Error ? err.message : err);
       if (err instanceof ModelUnavailableError) continue; // try next candidate
       throw err; // non-availability failure (bad request, auth, etc.) — surface directly
     }
