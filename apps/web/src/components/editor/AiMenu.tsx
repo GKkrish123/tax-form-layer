@@ -62,7 +62,7 @@ export function AiMenu() {
   }, []);
 
   async function autoDetect() {
-    const imageDataUrl = captureCanvasDataUrl();
+    const imageDataUrl = await captureCanvasDataUrl();
     if (!imageDataUrl) {
       toast.error('Open a form first', { description: 'The page must be rendered to scan it.' });
       return;

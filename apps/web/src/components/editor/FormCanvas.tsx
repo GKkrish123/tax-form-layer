@@ -3,13 +3,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useEditor } from '@/lib/store';
-import { registerCanvas } from '@/lib/canvas-capture';
+import { registerCanvas, registerSnapshotProvider } from '@/lib/canvas-capture';
 import { EditLayer } from './EditLayer';
 import { PreviewLayer } from './PreviewLayer';
 
-const MAX_FORM_WIDTH = 920;
-const MIN_FORM_WIDTH = 280;
-const WIDTH_STEP = 16;
+const RENDER_WIDTH = 920;
+const CAPTURE_WIDTH = 1080;
 
 export interface CanvasGeometry {
   width: number;
@@ -22,20 +21,13 @@ function isImageUrl(url: string): boolean {
   return /\.(png|jpe?g|gif|webp)$/i.test(url);
 }
 
-function snapWidth(raw: number): number {
-  const clamped = Math.min(MAX_FORM_WIDTH, Math.max(MIN_FORM_WIDTH, raw));
-  return Math.max(MIN_FORM_WIDTH, Math.round(clamped / WIDTH_STEP) * WIDTH_STEP);
-}
-
 export function FormCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
-  const renderWidthRef = useRef(0);
   const displayWidthRef = useRef(0);
   const renderGen = useRef(0);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pdfCache = useRef<{ url: string; doc: any } | null>(null);
-  const readyRef = useRef(false);
 
   const baseDocUrl = useEditor((s) => s.baseDocUrl);
   const activePage = useEditor((s) => s.activePage);
@@ -46,59 +38,77 @@ export function FormCanvas() {
     return (page?.size ?? s.template.pageSize).width;
   });
 
-  const [targetWidth, setTargetWidth] = useState(MAX_FORM_WIDTH);
   const [geom, setGeom] = useState<CanvasGeometry | null>(null);
   const [scale, setScale] = useState(1);
   const [error, setError] = useState<string | null>(null);
+
+  const baseDocUrlRef = useRef(baseDocUrl);
+  baseDocUrlRef.current = baseDocUrl;
+  const activePageRef = useRef(activePage);
+  activePageRef.current = activePage;
+  useEffect(() => {
+    registerSnapshotProvider(async () => {
+      const url = baseDocUrlRef.current;
+
+      if (isImageUrl(url)) {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.src = url;
+        await img.decode();
+        const w = CAPTURE_WIDTH;
+        const h = Math.max(1, Math.round((img.naturalHeight / img.naturalWidth) * w));
+        const off = document.createElement('canvas');
+        off.width = w;
+        off.height = h;
+        const ctx = off.getContext('2d');
+        if (!ctx) return null;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        return off;
+      }
+
+      const doc = pdfCache.current?.url === url ? pdfCache.current.doc : null;
+      if (!doc) return null;
+
+      const page = await doc.getPage(Math.min(activePageRef.current, doc.numPages));
+      const base = page.getViewport({ scale: 1 });
+      const vp = page.getViewport({ scale: CAPTURE_WIDTH / base.width });
+      const off = document.createElement('canvas');
+      off.width = Math.max(1, Math.round(vp.width));
+      off.height = Math.max(1, Math.round(vp.height));
+      const ctx = off.getContext('2d');
+      if (!ctx) return null;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, off.width, off.height);
+      await page.render({ canvasContext: ctx, viewport: vp }).promise;
+      return off;
+    });
+
+    return () => registerSnapshotProvider(null);
+  }, []);
 
   useEffect(() => {
     const el = frameRef.current;
     if (!el) return;
 
-    let timer: ReturnType<typeof setTimeout> | null = null;
-
-    const applyDisplayScale = (raw: number) => {
-      displayWidthRef.current = raw;
-      const rendered = renderWidthRef.current;
-      if (rendered > 0 && raw > 0) {
-        const next = raw / rendered;
-        setScale((prev) => (Math.abs(prev - next) < 0.001 ? prev : next));
-        setGeom((prev) =>
-          prev && Math.abs(prev.scale - next) >= 0.001 ? { ...prev, scale: next } : prev,
-        );
-      }
-    };
-
-    const publishRenderWidth = (raw: number) => {
+    const applyScale = (raw: number) => {
       if (raw <= 0) return;
-      const next = snapWidth(raw);
-      applyDisplayScale(raw);
-      if (next === renderWidthRef.current) return;
-      renderWidthRef.current = next;
-      setTargetWidth(next);
-    };
-
-    const onResize = (raw: number) => {
-      applyDisplayScale(raw);
-      if (timer) clearTimeout(timer);
-      if (!readyRef.current) {
-        publishRenderWidth(raw);
-        return;
-      }
-      timer = setTimeout(() => publishRenderWidth(raw), 150);
+      displayWidthRef.current = raw;
+      const next = Math.min(1, raw / RENDER_WIDTH);
+      setScale((prev) => (Math.abs(prev - next) < 0.001 ? prev : next));
+      setGeom((prev) =>
+        prev && Math.abs(prev.scale - next) >= 0.001 ? { ...prev, scale: next } : prev,
+      );
     };
 
     const ro = new ResizeObserver((entries) => {
-      const raw = entries[0]?.contentRect.width ?? el.clientWidth;
-      onResize(raw);
+      applyScale(entries[0]?.contentRect.width ?? el.clientWidth);
     });
     ro.observe(el);
-    onResize(el.clientWidth);
+    applyScale(el.clientWidth);
 
-    return () => {
-      ro.disconnect();
-      if (timer) clearTimeout(timer);
-    };
+    return () => ro.disconnect();
   }, []);
 
   useEffect(() => {
@@ -185,16 +195,15 @@ export function FormCanvas() {
 
     function finish(width: number, displayH: number, canvas: HTMLCanvasElement) {
       registerCanvas(canvas);
-      const s = displayWidthRef.current > 0 ? displayWidthRef.current / width : 1;
+      const s = displayWidthRef.current > 0 ? Math.min(1, displayWidthRef.current / width) : 1;
       setGeom({ width, height: displayH, ptToPx: width / pageWidth, scale: s });
       setScale(s);
-      readyRef.current = true;
       setError(null);
     }
 
     const run = isImageUrl(baseDocUrl)
-      ? renderImage(baseDocUrl, targetWidth)
-      : renderPdf(baseDocUrl, targetWidth);
+      ? renderImage(baseDocUrl, RENDER_WIDTH)
+      : renderPdf(baseDocUrl, RENDER_WIDTH);
 
     run.catch((err: unknown) => {
       if (cancelled || gen !== renderGen.current) return;
@@ -217,7 +226,7 @@ export function FormCanvas() {
         /* ignore */
       }
     };
-  }, [baseDocUrl, activePage, pageWidth, targetWidth]);
+  }, [baseDocUrl, activePage, pageWidth]);
 
   return (
     <div className="flex h-full justify-center overflow-auto p-3 [scrollbar-gutter:stable] sm:p-5 lg:p-8">

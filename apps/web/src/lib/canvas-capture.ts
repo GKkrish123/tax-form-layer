@@ -1,7 +1,15 @@
 let canvasEl: HTMLCanvasElement | null = null;
 
+type SnapshotProvider = () => Promise<HTMLCanvasElement | null> | HTMLCanvasElement | null;
+
+let snapshotProvider: SnapshotProvider | null = null;
+
 export function registerCanvas(el: HTMLCanvasElement | null): void {
   canvasEl = el;
+}
+
+export function registerSnapshotProvider(fn: SnapshotProvider | null): void {
+  snapshotProvider = fn;
 }
 
 export interface CaptureOptions {
@@ -26,20 +34,28 @@ function encodeAt(source: HTMLCanvasElement, dim: number, quality: number): stri
   return off.toDataURL('image/jpeg', quality);
 }
 
-export function captureCanvasDataUrl(opts: CaptureOptions = {}): string | null {
-  if (!canvasEl) return null;
-  const { maxDim = 1400, quality = 0.82, maxBytes = 175_000 } = opts;
+export async function captureCanvasDataUrl(opts: CaptureOptions = {}): Promise<string | null> {
+  let source: HTMLCanvasElement | null = null;
+  try {
+    source = snapshotProvider ? await snapshotProvider() : null;
+  } catch {
+    source = null;
+  }
+  if (!source) source = canvasEl;
+  if (!source || source.width < 1 || source.height < 1) return null;
+
+  const { maxDim = 1400, quality = 0.85, maxBytes = 260_000 } = opts;
   try {
     let dim = maxDim;
     let q = quality;
-    let out = encodeAt(canvasEl, dim, q);
+    let out = encodeAt(source, dim, q);
     // Shrink quality first, then dimensions, until the payload fits the budget.
     let guard = 0;
     while (out.length > maxBytes && guard++ < 12) {
       if (q > 0.5) q -= 0.1;
       else dim = Math.round(dim * 0.82);
       if (dim < 640) break;
-      out = encodeAt(canvasEl, dim, q);
+      out = encodeAt(source, dim, q);
     }
     return out;
   } catch {
