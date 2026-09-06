@@ -177,7 +177,7 @@ export function Toolbar({ onToggleLeft, onToggleRight, leftOpen, rightOpen }: To
   }
 
   return (
-    <header className="z-40 flex flex-wrap items-center gap-2 border-b bg-background/90 px-3 py-2 backdrop-blur">
+    <header className="z-40 flex flex-wrap items-center gap-1.5 border-b bg-background/90 px-2 py-2 backdrop-blur sm:gap-2 sm:px-3">
       <IconToggle
         label="Toggle data panel"
         active={leftOpen}
@@ -187,40 +187,40 @@ export function Toolbar({ onToggleLeft, onToggleRight, leftOpen, rightOpen }: To
         <Layers />
       </IconToggle>
 
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2">
         <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-indigo-700 text-primary-foreground shadow-sm">
           <Boxes className="h-4 w-4" />
         </span>
-        <span className="hidden text-sm font-semibold tracking-tight sm:block">
+        <span className="hidden text-sm font-semibold tracking-tight md:block">
           Tax&nbsp;Form&nbsp;Layer
         </span>
       </div>
 
-      <Separator orientation="vertical" className="mx-1 hidden h-6 sm:block" />
+      <Separator orientation="vertical" className="mx-0.5 hidden h-6 sm:block" />
 
       <FormsMenu />
 
       <Input
-        className="w-40 sm:w-64"
+        className="min-w-0 flex-1 basis-32 sm:max-w-xs sm:flex-none sm:basis-auto sm:w-48 md:w-64"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="Untitled template"
       />
       {dirty && (
-        <Badge variant="warning">
+        <Badge variant="warning" className="shrink-0">
           <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
           Unsaved
         </Badge>
       )}
 
-      <Tabs value={mode} onValueChange={(v) => setMode(v as 'edit' | 'preview')} className="ml-1">
+      <Tabs value={mode} onValueChange={(v) => setMode(v as 'edit' | 'preview')} className="shrink-0">
         <TabsList>
           <TabsTrigger value="edit">Edit</TabsTrigger>
           <TabsTrigger value="preview">Preview</TabsTrigger>
         </TabsList>
       </Tabs>
 
-      <div className="ml-auto flex items-center gap-1.5">
+      <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-1 sm:gap-1.5">
         <AddMenu onAdd={(t) => addField(newField(t))} />
         <AiMenu />
 
@@ -229,21 +229,21 @@ export function Toolbar({ onToggleLeft, onToggleRight, leftOpen, rightOpen }: To
           onClick={validate}
           className="hidden sm:inline-flex"
         >
-          <Check /> Validate
+          <Check /> <span className="hidden lg:inline">Validate</span>
         </ActionButton>
         <ActionButton
           label="Export annotation JSON"
           onClick={exportJson}
           className="hidden md:inline-flex"
         >
-          <Download /> Export
+          <Download /> <span className="hidden lg:inline">Export</span>
         </ActionButton>
         <ActionButton
           label="Import annotation JSON"
           onClick={() => fileRef.current?.click()}
           className="hidden md:inline-flex"
         >
-          <Upload /> Import
+          <Upload /> <span className="hidden lg:inline">Import</span>
         </ActionButton>
         <input
           ref={fileRef}

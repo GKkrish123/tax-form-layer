@@ -1,4 +1,5 @@
 import type { TextDrawOp } from '../plan/types.js';
+import type { Padding } from '@tax-form-layer/spec';
 
 /** Font metrics come from the drawing backend (pdf-lib, canvas), not this module. */
 export interface TextMeasurer {
@@ -14,6 +15,25 @@ export interface PositionedLine {
 export interface LayoutResult {
   fontSize: number;
   lines: PositionedLine[];
+}
+
+export function effectivePadding(
+  rect: { width: number; height: number },
+  padding: Padding | undefined,
+): Padding {
+  if (padding) return padding;
+  const h = Math.max(0, rect.height);
+  const w = Math.max(0, rect.width);
+  return {
+    top: clamp(h * 0.14, 0.6, 2.5),
+    bottom: clamp(h * 0.14, 0.6, 2.5),
+    left: clamp(w * 0.035, 0.8, 3.5),
+    right: clamp(w * 0.035, 0.8, 3.5),
+  };
+}
+
+function clamp(n: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, n));
 }
 
 function wrapLines(text: string, maxWidth: number, fontSize: number, m: TextMeasurer): string[] {
@@ -64,7 +84,7 @@ function alignX(lineWidth: number, innerLeft: number, innerWidth: number, align:
 
 export function layoutText(op: TextDrawOp, m: TextMeasurer): LayoutResult {
   const { rect, style } = op;
-  const pad = style.padding ?? { top: 0, right: 0, bottom: 0, left: 0 };
+  const pad = effectivePadding(rect, style.padding);
   const innerLeft = rect.x + pad.left;
   const innerTop = rect.y + pad.top;
   const innerWidth = Math.max(0, rect.width - pad.left - pad.right);

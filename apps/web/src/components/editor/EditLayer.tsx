@@ -4,15 +4,17 @@ import { useEditor } from '@/lib/store';
 import { FieldBox } from './FieldBox';
 import type { CanvasGeometry } from './FormCanvas';
 
-export function EditLayer({ geom }: { geom: CanvasGeometry }) {
-  const template = useEditor((s) => s.template);
-  const activePage = useEditor((s) => s.activePage);
-  const page = template.pages.find((p) => p.number === activePage);
+const EMPTY: never[] = [];
 
-  if (!page) return null;
+export function EditLayer({ geom }: { geom: CanvasGeometry }) {
+  const fields = useEditor((s) => {
+    const page = s.template.pages.find((p) => p.number === s.activePage);
+    return page?.fields ?? EMPTY;
+  });
+
   return (
     <>
-      {page.fields.map((field) => (
+      {fields.map((field) => (
         <FieldBox key={field.id} field={field} geom={geom} />
       ))}
     </>

@@ -15,6 +15,7 @@ export {
 } from './geometry/coordinates.js';
 export {
   layoutText,
+  effectivePadding,
   type TextMeasurer,
   type LayoutResult,
   type PositionedLine,

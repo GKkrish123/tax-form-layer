@@ -16,6 +16,8 @@
  *                     many free/open models reject it; JSON is parsed leniently)
  *   AI_MAX_TOKENS     max completion tokens, default 2048
  *   AI_TIMEOUT_MS     per-request timeout before abort+retry, default 90000
+ *   AI_BINDING_RANKING "on" to re-rank binding suggestions with the text model
+ *                     (off by default — heuristics only)
  *
  * Resilience: free-tier models frequently rotate, cold-start, or get rate-limited
  * (429). AI_MODEL/AI_VISION_MODEL are tried first, then a curated list of
@@ -29,6 +31,7 @@ const SITE_NAME = process.env.AI_SITE_NAME ?? 'Tax Form Layer';
 const JSON_MODE = process.env.AI_JSON_MODE === 'on';
 const MAX_TOKENS = Number(process.env.AI_MAX_TOKENS ?? '2048');
 const TIMEOUT_MS = Number(process.env.AI_TIMEOUT_MS ?? '90000');
+const BINDING_RANKING = process.env.AI_BINDING_RANKING === 'on';
 
 const TEXT_MODELS = dedupe([
   process.env.AI_MODEL,
@@ -51,6 +54,10 @@ function dedupe(values: Array<string | undefined>): string[] {
 
 export function isConfigured(): boolean {
   return API_KEY.length > 0;
+}
+
+export function isBindingRankingEnabled(): boolean {
+  return BINDING_RANKING && isConfigured();
 }
 
 interface ChatOptions {

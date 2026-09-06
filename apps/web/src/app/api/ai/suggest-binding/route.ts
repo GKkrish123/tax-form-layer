@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { chatJSON, isConfigured } from '@/lib/ai/provider';
+import { chatJSON, isBindingRankingEnabled } from '@/lib/ai/provider';
 import { suggestBindings, type BindingSuggestion } from '@/lib/ai/heuristics';
 
 export const runtime = 'nodejs';
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
 
   const heuristic = suggestBindings(body.label ?? '', body.boxNumber, body.data, 8);
 
-  if (!isConfigured()) {
+  if (!isBindingRankingEnabled()) {
     return NextResponse.json({ source: 'heuristic', suggestions: heuristic });
   }
 

@@ -13,6 +13,7 @@ const initialTemplate: FormTemplate = initialParsed.ok
   : (w2 as unknown as FormTemplate);
 
 export type EditorMode = 'edit' | 'preview';
+export type AiBusyKind = 'detect-boxes' | 'suggest-bindings' | null;
 
 interface EditorState {
   template: FormTemplate;
@@ -22,8 +23,10 @@ interface EditorState {
   mode: EditorMode;
   baseDocUrl: string;
   dirty: boolean;
+  aiBusy: AiBusyKind;
 
   setMode: (mode: EditorMode) => void;
+  setAiBusy: (aiBusy: AiBusyKind) => void;
   selectField: (id: string | null) => void;
   setActivePage: (n: number) => void;
   setData: (data: unknown) => void;
@@ -35,6 +38,7 @@ interface EditorState {
   updateFieldRect: (id: string, rect: Partial<Rect>) => void;
   addField: (field: Field) => void;
   addFields: (fields: Field[]) => void;
+  updateActivePageFields: (updater: (fields: Field[]) => Field[]) => void;
   removeField: (id: string) => void;
   markSaved: () => void;
 }
@@ -66,8 +70,10 @@ export const useEditor = create<EditorState>((set, get) => ({
   mode: 'edit',
   baseDocUrl: baseUrlOf(initialTemplate),
   dirty: false,
+  aiBusy: null,
 
   setMode: (mode) => set({ mode }),
+  setAiBusy: (aiBusy) => set({ aiBusy }),
   selectField: (selectedFieldId) => set({ selectedFieldId }),
   setActivePage: (activePage) => set({ activePage, selectedFieldId: null }),
   setData: (data) => set({ data }),
@@ -98,7 +104,15 @@ export const useEditor = create<EditorState>((set, get) => ({
       const existing = page?.fields.find((f) => f.id === id);
       if (!existing) return s;
       const next = { ...existing, ...patch } as Field;
-      return { template: replaceField(s.template, s.activePage, id, next), dirty: true };
+      const renamed =
+        typeof patch.id === 'string' && patch.id !== id && s.selectedFieldId === id
+          ? patch.id
+          : s.selectedFieldId;
+      return {
+        template: replaceField(s.template, s.activePage, id, next),
+        selectedFieldId: renamed,
+        dirty: true,
+      };
     }),
 
   updateFieldRect: (id, rect) =>
@@ -128,6 +142,17 @@ export const useEditor = create<EditorState>((set, get) => ({
         ...s.template,
         pages: s.template.pages.map((p) =>
           p.number === s.activePage ? { ...p, fields: [...p.fields, ...fields] } : p,
+        ),
+      },
+      dirty: true,
+    })),
+
+  updateActivePageFields: (updater) =>
+    set((s) => ({
+      template: {
+        ...s.template,
+        pages: s.template.pages.map((p) =>
+          p.number === s.activePage ? { ...p, fields: updater(p.fields) } : p,
         ),
       },
       dirty: true,

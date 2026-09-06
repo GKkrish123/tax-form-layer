@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Field } from '@tax-form-layer/spec';
 import { chatJSON, isConfigured } from '@/lib/ai/provider';
+import { guessAlign, guessFormat } from '@/lib/ai/heuristics';
 
 export const runtime = 'nodejs';
 
@@ -72,10 +73,40 @@ function clamp01(n: number): number {
 }
 
 function buildField(box: DetectedBox, index: number) {
+  const label = box.label ?? `Field ${index + 1}`;
+  const hint = `${label} ${box.boxNumber ?? ''}`;
+  const formatType = guessFormat(hint);
+  const align = guessAlign(hint);
+
+  const format =
+    formatType === 'currency'
+      ? {
+          type: 'currency' as const,
+          locale: 'en-US',
+          currency: 'USD',
+          decimals: 2,
+          symbol: false,
+          grouping: true,
+          negative: 'parentheses' as const,
+        }
+      : formatType === 'date'
+        ? { type: 'date' as const, outputFormat: 'MM/DD/YYYY', locale: 'en-US' }
+        : formatType === 'ssn'
+          ? { type: 'ssn' as const, mask: false }
+          : formatType === 'ein'
+            ? { type: 'ein' as const }
+            : formatType === 'phone'
+              ? { type: 'phone' as const }
+              : formatType === 'percent'
+                ? { type: 'percent' as const, locale: 'en-US', decimals: 2, scale: false }
+                : formatType === 'text'
+                  ? { type: 'text' as const, case: 'none' as const }
+                  : { type: 'none' as const };
+
   const candidate = {
     type: 'value' as const,
     id: `detected_${index + 1}`,
-    label: box.label ?? `Field ${index + 1}`,
+    label,
     ...(box.boxNumber ? { boxNumber: String(box.boxNumber) } : {}),
     rect: {
       x: clamp01(box.x),
@@ -86,7 +117,8 @@ function buildField(box: DetectedBox, index: number) {
       unit: 'fraction' as const,
     },
     binding: { source: 'jsonpath' as const, path: '$.' },
-    format: { type: 'none' as const },
+    format,
+    ...(align !== 'left' ? { style: { align } } : {}),
   };
   const parsed = Field.safeParse(candidate);
   return parsed.success ? parsed.data : null;

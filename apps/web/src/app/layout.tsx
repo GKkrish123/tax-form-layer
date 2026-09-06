@@ -4,9 +4,16 @@ import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
 export const metadata: Metadata = {
-  title: 'Tax Form Layer — Annotation Studio',
+  title: 'Tax Form Layer - Annotation Studio',
   description:
-    'Author medium-agnostic annotations for U.S. tax forms and print values into every box.',
+    'Author medium agnostic annotations for U.S. tax forms and print values into every box.',
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: '32x32' },
+      { url: '/icon', type: 'image/png' },
+    ],
+    apple: [{ url: '/apple-icon', sizes: '180x180', type: 'image/png' }],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

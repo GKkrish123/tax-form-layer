@@ -212,11 +212,18 @@ function BindingEditor({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ label, boxNumber, data }),
       });
-      const json = (await res.json()) as { suggestions?: Suggestion[] };
+      const json = (await res.json()) as {
+        suggestions?: Suggestion[];
+        source?: string;
+        error?: string;
+      };
+      if (!res.ok) throw new Error(json.error ?? 'Suggestion failed');
       setSuggestions(json.suggestions ?? []);
       if ((json.suggestions ?? []).length === 0) toast.info('No matching paths found');
-    } catch {
-      toast.error('Suggestion failed');
+    } catch (err) {
+      toast.error('Suggestion failed', {
+        description: err instanceof Error ? err.message : undefined,
+      });
     } finally {
       setLoading(false);
     }
@@ -250,7 +257,7 @@ function BindingEditor({
                 className="h-8 w-8 shrink-0"
                 onClick={suggest}
                 disabled={loading}
-                title="Suggest bindings with AI"
+                title="Suggest bindings"
               >
                 {loading ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />

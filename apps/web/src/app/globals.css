@@ -69,3 +69,18 @@
   background-image: radial-gradient(rgba(15, 23, 42, 0.06) 1px, transparent 1px);
   background-size: 18px 18px;
 }
+
+.field-box {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  contain: layout style;
+  transition: box-shadow 120ms ease, ring-color 120ms ease;
+}
+.field-box.is-dragging {
+  z-index: 30 !important;
+  transition: none !important;
+  will-change: left, top, width, height;
+  cursor: grabbing;
+}
+

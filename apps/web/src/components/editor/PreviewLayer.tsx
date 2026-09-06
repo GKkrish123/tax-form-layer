@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { planTemplate, type DrawOp } from '@tax-form-layer/engine';
+import { effectivePadding, planTemplate, type DrawOp } from '@tax-form-layer/engine';
 import type { Style } from '@tax-form-layer/spec';
 import { useEditor } from '@/lib/store';
 import type { CanvasGeometry } from './FormCanvas';
@@ -47,15 +47,20 @@ export function PreviewLayer({ geom }: { geom: CanvasGeometry }) {
         if (![left, top, width, height].every(Number.isFinite)) return null;
 
         if (op.kind === 'text') {
+          const pad = effectivePadding(op.rect, op.style.padding);
           return (
             <div
               key={`${op.fieldId}-${i}`}
-              className="absolute flex overflow-hidden leading-none"
+              className="absolute box-border flex overflow-hidden leading-none"
               style={{
                 left,
                 top,
                 width,
                 height,
+                paddingTop: pad.top * s,
+                paddingRight: pad.right * s,
+                paddingBottom: pad.bottom * s,
+                paddingLeft: pad.left * s,
                 justifyContent: cssJustify(op.style.align),
                 alignItems: cssAlign(op.style.verticalAlign),
                 fontFamily: fontFamily(op.style.font),
@@ -71,11 +76,17 @@ export function PreviewLayer({ geom }: { geom: CanvasGeometry }) {
           );
         }
 
+        const inset = Math.min(width, height) * 0.12;
         return (
           <svg
             key={`${op.fieldId}-${i}`}
             className="absolute"
-            style={{ left, top, width, height }}
+            style={{
+              left: left + inset,
+              top: top + inset,
+              width: Math.max(0, width - inset * 2),
+              height: Math.max(0, height - inset * 2),
+            }}
             viewBox="0 0 10 10"
             stroke={op.color}
             strokeWidth={1.4}
