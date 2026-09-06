@@ -175,7 +175,7 @@ export async function chat(messages: ChatMessage[], opts: ChatOptions = {}): Pro
   for (const model of candidates) {
     try {
       const result = await callModel(model, messages, opts);
-      console.log(`[ai] model responded: ${model}`);
+      console.log(`[ai] model responded: ${model}`, result);
       return result;
     } catch (err) {
       lastError = err;
