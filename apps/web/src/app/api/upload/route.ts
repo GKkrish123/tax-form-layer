@@ -1,3 +1,4 @@
+import { put } from '@vercel/blob';
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
 
@@ -10,7 +11,7 @@ const ALLOWED: Record<string, string> = {
   'image/webp': 'webp',
 };
 
-const MAX_BYTES = 20 * 1024 * 1024; // 20 MB
+const MAX_BYTES = 4.5 * 1024 * 1024;
 
 export async function POST(req: NextRequest) {
   const form = await req.formData();
@@ -25,23 +26,27 @@ export async function POST(req: NextRequest) {
       { status: 415 },
     );
   }
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  if (bytes.byteLength > MAX_BYTES) {
-    return NextResponse.json({ error: 'File exceeds 20 MB limit' }, { status: 413 });
+  if (file.size > MAX_BYTES) {
+    return NextResponse.json({ error: 'File exceeds 4.5 MB limit' }, { status: 413 });
   }
 
   const name = `${randomUUID()}.${ext}`;
   const kind = ext === 'pdf' ? 'pdf' : 'image';
 
-  if (process.env.BLOB_READ_WRITE_TOKEN) {
-    const { put } = await import('@vercel/blob');
+  if (process.env.VERCEL || process.env.BLOB_READ_WRITE_TOKEN) {
     const blob = await put(`uploads/${name}`, file, {
-      access: 'public',
+      access: 'private',
       contentType: file.type,
+      addRandomSuffix: false,
     });
-    return NextResponse.json({ url: blob.url, kind });
+    return NextResponse.json({
+      url: `/api/files?pathname=${encodeURIComponent(blob.pathname)}`,
+      kind,
+      pathname: blob.pathname,
+    });
   }
 
+  const bytes = new Uint8Array(await file.arrayBuffer());
   const { writeFile, mkdir } = await import('node:fs/promises');
   const { join } = await import('node:path');
   const dir = join(process.cwd(), 'public', 'uploads');
