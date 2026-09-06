@@ -38,8 +38,8 @@ function TreeNode({ node, depth }: { node: DataNode; depth: number }) {
   return (
     <div>
       <div
-        className="group flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-1 hover:bg-accent"
-        style={{ paddingLeft: depth * 12 + 6 }}
+        className="group flex min-w-0 cursor-pointer items-center gap-1 overflow-hidden rounded-md px-1.5 py-1 hover:bg-accent"
+        style={{ paddingLeft: Math.min(depth, 6) * 10 + 6 }}
         onClick={() => (isBranch ? setOpen((o) => !o) : assignPathToSelected(node.path))}
         title={node.path}
       >
@@ -54,9 +54,11 @@ function TreeNode({ node, depth }: { node: DataNode; depth: number }) {
         ) : (
           <span className="w-3.5" />
         )}
-        <span className="font-mono text-[11px] font-medium text-foreground">{node.key}</span>
+        <span className="min-w-0 shrink truncate font-mono text-[11px] font-medium text-foreground">
+          {node.key}
+        </span>
         {node.kind === 'leaf' && (
-          <span className="ml-1 truncate font-mono text-[11px] text-muted-foreground">
+          <span className="min-w-0 truncate font-mono text-[11px] text-muted-foreground">
             {JSON.stringify(node.value)}
           </span>
         )}
@@ -68,7 +70,7 @@ function TreeNode({ node, depth }: { node: DataNode; depth: number }) {
         <Button
           variant="secondary"
           size="sm"
-          className={cn('ml-auto hidden h-5 px-1.5 text-[10px] group-hover:inline-flex')}
+          className={cn('ml-auto hidden h-5 shrink-0 px-1.5 text-[10px] group-hover:inline-flex')}
           onClick={(e) => {
             e.stopPropagation();
             assignPathToSelected(node.path);
@@ -94,25 +96,25 @@ export function DataExplorer() {
   const tree = useMemo(() => buildDataTree(data), [data]);
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
-        <div className="flex items-center gap-2">
-          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-accent text-accent-foreground">
+    <div className="flex h-full min-w-0 flex-col overflow-hidden">
+      <div className="flex min-w-0 shrink-0 items-center justify-between gap-2 border-b px-3 py-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-accent text-accent-foreground">
             <Database className="h-3.5 w-3.5" />
           </span>
-          <h2 className="panel-title">Data set</h2>
+          <h2 className="panel-title truncate">Data set</h2>
         </div>
         <Button
           variant="ghost"
           size="sm"
-          className="h-6 text-primary"
+          className="h-6 shrink-0 px-2 text-primary"
           onClick={() => setRaw(raw === null ? JSON.stringify(data, null, 2) : null)}
         >
           {raw === null ? 'Edit JSON' : 'Tree view'}
         </Button>
       </div>
 
-      <p className="px-4 py-2 text-[11px] leading-relaxed text-muted-foreground">
+      <p className="min-w-0 shrink-0 break-words px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
         {selectedFieldId ? (
           <>
             Click a leaf to bind it to{' '}
