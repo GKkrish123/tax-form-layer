@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Loader2, MousePointerClick, Sparkles, Trash2 } from 'lucide-react';
-import type { Field, Binding, FormatSpec } from '@tax-form-layer/spec';
-import { formatValue } from '@tax-form-layer/engine';
+import type { Field, Binding, FormatSpec, RepeatingGroup } from '@tax-form-layer/spec';
+import { formatValue, resolveBinding, queryJsonPath } from '@tax-form-layer/engine';
 import { useEditor } from '@/lib/store';
 import { previewPath } from '@/lib/jsonpath';
 import { cn } from '@/lib/utils';
@@ -97,7 +97,8 @@ export function PropertyPanel() {
     );
   }
 
-  const hasBinding = field.type !== 'repeat';
+  const isRepeat = field.type === 'repeat';
+  const hasBinding = !isRepeat;
   const hasFormat = field.type === 'value' || field.type === 'comb';
   const patch = (p: Partial<Field>) => updateField(field.id, p);
 
@@ -143,6 +144,14 @@ export function PropertyPanel() {
         ))}
       </Section>
 
+      {isRepeat && (
+        <RepeatEditor
+          field={field as RepeatingGroup}
+          data={data}
+          onChange={patch}
+        />
+      )}
+
       {hasBinding && 'binding' in field && (
         <BindingEditor
           binding={field.binding}
@@ -160,14 +169,16 @@ export function PropertyPanel() {
         />
       )}
 
-      {field.type === 'value' && 'binding' in field && 'format' in field && (
+      {(field.type === 'value' || field.type === 'comb') && 'binding' in field && 'format' in field && (
         <Section title="Live value">
           <div className="rounded-md bg-muted px-2 py-1.5 font-mono text-xs text-foreground">
-            {field.binding.source === 'jsonpath'
-              ? String(
-                  formatValue(coerce(previewPath(field.binding.path, data)), field.format) || '—',
-                )
-              : '—'}
+            {(() => {
+              const raw = resolveBinding(field.binding, { root: data });
+              const formatted = formatValue(coerce(raw), field.format);
+              return formatted !== null && formatted !== undefined && formatted !== ''
+                ? String(formatted)
+                : '—';
+            })()}
           </div>
         </Section>
       )}
@@ -178,6 +189,147 @@ export function PropertyPanel() {
         <Trash2 /> Delete field
       </Button>
     </div>
+  );
+}
+
+function RepeatEditor({
+  field,
+  data,
+  onChange,
+}: {
+  field: RepeatingGroup;
+  data: unknown;
+  onChange: (p: Partial<Field>) => void;
+}) {
+  const items = (() => {
+    try {
+      const result = queryJsonPath(field.itemsPath, { root: data });
+      return Array.isArray(result) ? (result as unknown[]) : null;
+    } catch {
+      return null;
+    }
+  })();
+
+  return (
+    <Section title="Repeating group">
+      <Row label="Items path">
+        <Input
+          value={field.itemsPath}
+          onChange={(e) => onChange({ itemsPath: e.target.value } as Partial<Field>)}
+          placeholder="$.items"
+        />
+      </Row>
+      <Row label="Row height">
+        <Input
+          type="number"
+          step={0.005}
+          min={0.001}
+          value={round(field.rowHeight)}
+          onChange={(e) => onChange({ rowHeight: toFinite(e.target.value) } as Partial<Field>)}
+        />
+      </Row>
+      <Row label="Max rows">
+        <Input
+          type="number"
+          min={1}
+          value={field.maxRows ?? ''}
+          placeholder="unlimited"
+          onChange={(e) => {
+            const v = toFinite(e.target.value);
+            onChange({ maxRows: v > 0 ? v : undefined } as Partial<Field>);
+          }}
+        />
+      </Row>
+
+      <div className="mt-2 space-y-1.5">
+        <p className="text-[10px] font-medium text-muted-foreground">Live data</p>
+        <div className="rounded-md border bg-muted/50 px-2 py-1.5 text-[10px]">
+          {items === null ? (
+            <span className="text-muted-foreground italic">
+              No array found at <span className="font-mono">{field.itemsPath}</span>
+            </span>
+          ) : items.length === 0 ? (
+            <span className="text-muted-foreground italic">Array is empty</span>
+          ) : (
+            <>
+              <p className="mb-1 font-semibold text-foreground">
+                {items.length} row{items.length !== 1 ? 's' : ''}
+                {field.maxRows ? ` (max ${field.maxRows} shown)` : ''}
+              </p>
+              <div className="space-y-0.5">
+                {items.slice(0, field.maxRows ?? 4).map((item, i) => (
+                  <div
+                    key={i}
+                    className="flex items-start gap-1.5 rounded bg-background/70 px-1.5 py-0.5"
+                  >
+                    <span className="shrink-0 font-mono text-muted-foreground">[{i}]</span>
+                    <span className="min-w-0 truncate font-mono text-foreground">
+                      {typeof item === 'object' && item !== null
+                        ? Object.entries(item as Record<string, unknown>)
+                            .slice(0, 3)
+                            .map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
+                            .join('  ·  ')
+                        : JSON.stringify(item)}
+                    </span>
+                  </div>
+                ))}
+                {items.length > (field.maxRows ?? 4) && (
+                  <p className="pl-1 text-muted-foreground">
+                    +{items.length - (field.maxRows ?? 4)} more…
+                  </p>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-2 space-y-1">
+        <p className="text-[10px] font-medium text-muted-foreground">
+          {field.fields.length} child field{field.fields.length !== 1 ? 's' : ''}
+        </p>
+        <div className="space-y-0.5 rounded-md border bg-muted/50 p-1">
+          {field.fields.map((child) => {
+            const childPath =
+              'binding' in child && child.binding.source === 'jsonpath'
+                ? child.binding.path
+                : null;
+            const preview = (() => {
+              if (!childPath || items === null || items.length === 0) return null;
+              try {
+                const v = resolveBinding(
+                  { source: 'jsonpath', path: childPath },
+                  { root: items[0], row: items[0] },
+                );
+                return v !== null && v !== undefined ? String(v) : null;
+              } catch {
+                return null;
+              }
+            })();
+            return (
+              <div
+                key={child.id}
+                className="flex min-w-0 items-center gap-1.5 rounded px-1.5 py-1 text-[10px] hover:bg-accent"
+              >
+                <span className="truncate font-medium text-foreground">
+                  {child.label ?? child.id}
+                </span>
+                {childPath && (
+                  <span className="ml-auto shrink-0 font-mono text-muted-foreground">
+                    {childPath}
+                  </span>
+                )}
+                {preview && (
+                  <span className="ml-1 shrink-0 rounded bg-emerald-100 px-1 font-mono text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400">
+                    {preview}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </Section>
   );
 }
 

@@ -3,8 +3,39 @@
 import { memo, useRef } from 'react';
 import clsx from 'clsx';
 import type { Field, Rect } from '@tax-form-layer/spec';
+import { resolveBinding, formatValue, queryJsonPath } from '@tax-form-layer/engine';
 import { useEditor } from '@/lib/store';
 import type { CanvasGeometry } from './FormCanvas';
+
+function getBinding(field: Field): { path: string | null; isBound: boolean } {
+  if (field.type === 'repeat') return { path: field.itemsPath, isBound: true };
+  if (!('binding' in field)) return { path: null, isBound: false };
+  const b = field.binding;
+  if (b.source === 'jsonpath') {
+    const isBound = b.path !== '$.' && b.path.length > 2;
+    return { path: b.path, isBound };
+  }
+  if (b.source === 'template') return { path: `"${b.template}"`, isBound: true };
+  if (b.source === 'const')    return { path: String(b.value), isBound: true };
+  if (b.source === 'pointer')  return { path: b.pointer, isBound: true };
+  return { path: null, isBound: false };
+}
+
+const FORMAT_BADGE: Record<string, string> = {
+  currency: '$',
+  percent: '%',
+  date: 'date',
+  ssn: 'SSN',
+  ein: 'EIN',
+  phone: 'tel',
+  text: 'txt',
+};
+
+function formatBadge(field: Field): string | null {
+  if (!('format' in field) || !field.format) return null;
+  const t = (field.format as { type?: string }).type ?? '';
+  return FORMAT_BADGE[t] ?? null;
+}
 
 type Corner = 'nw' | 'ne' | 'sw' | 'se';
 
@@ -30,6 +61,7 @@ function FieldBoxImpl({ field, geom }: { field: Field; geom: CanvasGeometry }) {
   const selected = useEditor((s) => s.selectedFieldId === field.id);
   const selectField = useEditor((s) => s.selectField);
   const updateFieldRect = useEditor((s) => s.updateFieldRect);
+  const data = useEditor((s) => s.data);
 
   const elRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragMode | null>(null);
@@ -171,6 +203,40 @@ function FieldBoxImpl({ field, geom }: { field: Field; geom: CanvasGeometry }) {
   const width = field.rect.width * geom.width;
   const height = field.rect.height * geom.height;
 
+  const { path: bindingPath, isBound } = getBinding(field);
+  const badge = formatBadge(field);
+  const pathLabel = bindingPath
+    ? isBound
+      ? bindingPath.replace(/^\$\.?/, '')
+      : 'unbound'
+    : null;
+
+  const liveValue = (() => {
+    try {
+      if (field.type === 'repeat') {
+        const items = queryJsonPath(field.itemsPath, { root: data });
+        if (!Array.isArray(items)) return 'no data';
+        const shown = field.maxRows ? Math.min(items.length, field.maxRows) : items.length;
+        return `${shown} row${shown !== 1 ? 's' : ''}${field.maxRows && items.length > field.maxRows ? ` of ${items.length}` : ''}`;
+      }
+      if (!('binding' in field)) return null;
+      const raw = resolveBinding(field.binding, { root: data });
+      if (raw === undefined || raw === null) return null;
+      const fmt = 'format' in field ? field.format : undefined;
+      const formatted = fmt
+        ? formatValue(
+            typeof raw === 'object' ? JSON.stringify(raw) : (raw as string | number | boolean),
+            fmt,
+          )
+        : String(raw);
+      return formatted !== null && formatted !== undefined && String(formatted).trim() !== ''
+        ? String(formatted)
+        : null;
+    } catch {
+      return null;
+    }
+  })();
+
   return (
     <div
       ref={elRef}
@@ -194,18 +260,68 @@ function FieldBoxImpl({ field, geom }: { field: Field; geom: CanvasGeometry }) {
         !editable && 'cursor-not-allowed opacity-70',
       )}
       style={{ left, top, width, height }}
-      title={field.label ?? field.id}
+      title={
+        [field.label ?? field.id, bindingPath ? `→ ${bindingPath}` : null]
+          .filter(Boolean)
+          .join('  ')
+      }
     >
       <span
         className={clsx(
-          'pointer-events-none absolute -top-5 left-0 z-20 max-w-[220px] truncate rounded px-1.5 py-0.5 text-[9px] font-medium text-white shadow-sm',
+          'pointer-events-none absolute -top-[22px] left-0 z-20 max-w-[240px] truncate rounded px-1.5 py-0.5 text-[10px] font-medium text-white shadow-sm',
           LABEL_COLORS[field.type],
           selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
         )}
       >
         {field.boxNumber ? `${field.boxNumber} · ` : ''}
-        {field.id}
+        {field.label ?? field.id}
       </span>
+
+      {bindingPath !== null && (
+        <span
+          className={clsx(
+            'pointer-events-none absolute right-1 top-1 h-2 w-2 rounded-full shadow-sm',
+            isBound ? 'bg-emerald-500' : 'bg-orange-400',
+          )}
+          title={isBound ? `Bound: ${bindingPath}` : 'Not yet bound'}
+        />
+      )}
+
+      {badge && (
+        <span
+          className={clsx(
+            'pointer-events-none absolute bottom-0.5 left-0.5 rounded px-1 py-px text-[8px] font-semibold leading-tight opacity-70',
+            LABEL_COLORS[field.type],
+            'text-white',
+          )}
+        >
+          {badge}
+        </span>
+      )}
+
+      {pathLabel !== null && (
+        <span
+          className={clsx(
+            'pointer-events-none absolute inset-x-1.5 top-1/2 -translate-y-1/2 truncate text-center font-mono leading-none text-[9px]',
+            isBound ? 'text-slate-600/70' : 'text-orange-500/90',
+          )}
+        >
+          {pathLabel}
+        </span>
+      )}
+
+      {liveValue !== null && (
+        <span
+          className={clsx(
+            'pointer-events-none absolute -bottom-[22px] left-0 z-20 max-w-[240px] truncate rounded px-1.5 py-0.5',
+            'bg-slate-700/90 text-[10px] font-mono font-medium text-white shadow-sm',
+            selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+          )}
+        >
+          {liveValue}
+        </span>
+      )}
+
       {selected &&
         editable &&
         (['nw', 'ne', 'sw', 'se'] as Corner[]).map((corner) => (
@@ -248,11 +364,15 @@ export const FieldBox = memo(FieldBoxImpl, (prev, next) => {
     return false;
   }
   if (prev.field === next.field) return true;
+  const pb = getBinding(prev.field);
+  const nb = getBinding(next.field);
   return (
     prev.field.id === next.field.id &&
     prev.field.type === next.field.type &&
     prev.field.label === next.field.label &&
     prev.field.boxNumber === next.field.boxNumber &&
+    pb.path === nb.path &&
+    pb.isBound === nb.isBound &&
     rectEqual(prev.field.rect, next.field.rect)
   );
 });

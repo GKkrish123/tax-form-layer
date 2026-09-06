@@ -7,10 +7,10 @@ import {
   Check,
   Download,
   FileDown,
-  Layers,
+  PanelLeft,
+  PanelRight,
   Plus,
   Save,
-  SlidersHorizontal,
   Upload,
 } from 'lucide-react';
 import { parseTemplate, type Field } from '@tax-form-layer/spec';
@@ -182,9 +182,8 @@ export function Toolbar({ onToggleLeft, onToggleRight, leftOpen, rightOpen }: To
         label="Toggle data panel"
         active={leftOpen}
         onClick={onToggleLeft}
-        className="lg:hidden"
       >
-        <Layers />
+        <PanelLeft />
       </IconToggle>
 
       <div className="flex shrink-0 items-center gap-2">
@@ -263,9 +262,8 @@ export function Toolbar({ onToggleLeft, onToggleRight, leftOpen, rightOpen }: To
           label="Toggle properties panel"
           active={rightOpen}
           onClick={onToggleRight}
-          className="lg:hidden"
         >
-          <SlidersHorizontal />
+          <PanelRight />
         </IconToggle>
       </div>
     </header>

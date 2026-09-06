@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 export const runtime = 'nodejs';
@@ -33,11 +31,21 @@ export async function POST(req: NextRequest) {
   }
 
   const name = `${randomUUID()}.${ext}`;
+  const kind = ext === 'pdf' ? 'pdf' : 'image';
+
+  if (process.env.BLOB_READ_WRITE_TOKEN) {
+    const { put } = await import('@vercel/blob');
+    const blob = await put(`uploads/${name}`, bytes, {
+      access: 'public',
+      contentType: file.type,
+    });
+    return NextResponse.json({ url: blob.url, kind });
+  }
+
+  const { writeFile, mkdir } = await import('node:fs/promises');
+  const { join } = await import('node:path');
   const dir = join(process.cwd(), 'public', 'uploads');
   await mkdir(dir, { recursive: true });
   await writeFile(join(dir, name), bytes);
-
-  const url = `/uploads/${name}`;
-  const kind = ext === 'pdf' ? 'pdf' : 'image';
-  return NextResponse.json({ url, kind });
+  return NextResponse.json({ url: `/uploads/${name}`, kind });
 }

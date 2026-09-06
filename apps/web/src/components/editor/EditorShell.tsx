@@ -14,7 +14,7 @@ import { PropertiesDrawer } from './PropertiesDrawer';
 function useIsLg() {
   const [isLg, setIsLg] = useState(false);
   useEffect(() => {
-    const mq = window.matchMedia('(min-width: 1024px)');
+    const mq = window.matchMedia('(min-width: 1200px)');
     const sync = () => setIsLg(mq.matches);
     sync();
     mq.addEventListener('change', sync);
@@ -38,8 +38,10 @@ export function EditorShell() {
   }, [isLg]);
 
   useEffect(() => {
-    if (isLg) return;
-    if (selectedFieldId) setPropsDrawerOpen(true);
+    if (selectedFieldId) {
+      if (isLg) setRightOpen(true);
+      else setPropsDrawerOpen(true);
+    }
   }, [selectedFieldId, isLg]);
 
   function handlePropsDrawerChange(open: boolean) {
@@ -76,11 +78,17 @@ export function EditorShell() {
 
           <aside
             className={clsx(
-              'absolute inset-y-0 left-0 z-30 flex w-[min(100%,20rem)] flex-col border-r bg-background shadow-panel transition-transform duration-200 lg:static lg:z-auto lg:w-72 lg:max-w-[22vw] lg:shadow-none xl:w-80',
-              leftOpen ? 'translate-x-0' : '-translate-x-full lg:hidden',
+              'absolute inset-y-0 left-0 z-30 flex flex-col border-r bg-background shadow-panel',
+              'w-[min(100%,20rem)] transition-transform duration-200',
+              'lg:static lg:z-auto lg:shadow-none lg:transition-[width,opacity] lg:duration-200',
+              leftOpen
+                ? 'translate-x-0 lg:w-72 lg:max-w-[22vw] lg:opacity-100 xl:w-80'
+                : '-translate-x-full lg:w-0 lg:translate-x-0 lg:overflow-hidden lg:opacity-0',
             )}
           >
-            <DataExplorer />
+            <div className="flex h-full w-[min(100%,20rem)] flex-col lg:w-72 xl:w-80">
+              <DataExplorer />
+            </div>
           </aside>
 
           <main
@@ -94,19 +102,24 @@ export function EditorShell() {
 
           <aside
             className={clsx(
-              'hidden flex-col border-l bg-background lg:flex lg:w-80 lg:max-w-[24vw] xl:w-96',
-              rightOpen ? 'lg:flex' : 'lg:hidden',
+              'flex flex-col border-l bg-background',
+              'lg:transition-[width,opacity] lg:duration-200',
+              rightOpen
+                ? 'hidden lg:flex lg:w-80 lg:max-w-[24vw] lg:opacity-100 xl:w-96'
+                : 'hidden lg:flex lg:w-0 lg:overflow-hidden lg:opacity-0',
             )}
           >
-            <div className="flex shrink-0 items-center gap-2 border-b px-3 py-2.5 sm:px-4 sm:py-3">
-              <span className="flex h-6 w-6 items-center justify-center rounded-md bg-accent text-accent-foreground">
-                <SlidersHorizontal className="h-3.5 w-3.5" />
-              </span>
-              <h2 className="panel-title">Properties</h2>
-            </div>
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-              <PropertyPanel />
-              <VersionPanel />
+            <div className="flex h-full w-80 flex-col xl:w-96">
+              <div className="flex shrink-0 items-center gap-2 border-b px-3 py-2.5 sm:px-4 sm:py-3">
+                <span className="flex h-6 w-6 items-center justify-center rounded-md bg-accent text-accent-foreground">
+                  <SlidersHorizontal className="h-3.5 w-3.5" />
+                </span>
+                <h2 className="panel-title">Properties</h2>
+              </div>
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                <PropertyPanel />
+                <VersionPanel />
+              </div>
             </div>
           </aside>
         </div>
