@@ -191,6 +191,22 @@ export async function chat(messages: ChatMessage[], opts: ChatOptions = {}): Pro
   );
 }
 
+function closeJson(s: string): string {
+  const stack: string[] = [];
+  let inStr = false;
+  let esc = false;
+  for (const c of s) {
+    if (esc) { esc = false; continue; }
+    if (c === '\\' && inStr) { esc = true; continue; }
+    if (c === '"') { inStr = !inStr; continue; }
+    if (inStr) continue;
+    if (c === '{') stack.push('}');
+    else if (c === '[') stack.push(']');
+    else if ((c === '}' || c === ']') && stack.length) stack.pop();
+  }
+  return s + stack.reverse().join('');
+}
+
 export async function chatJSON<T = unknown>(
   messages: ChatMessage[],
   opts: ChatOptions = {},
@@ -201,18 +217,16 @@ export async function chatJSON<T = unknown>(
     .replace(/^```(?:json)?/i, '')
     .replace(/```$/, '')
     .trim();
-  try {
-    return JSON.parse(cleaned) as T;
-  } catch {
-    // Lenient recovery: extract the first balanced JSON object/array from prose
-    // (reasoning models like Nemotron/DeepSeek often add commentary around it).
-    const start = cleaned.search(/[[{]/);
-    const end = Math.max(cleaned.lastIndexOf('}'), cleaned.lastIndexOf(']'));
-    if (start !== -1 && end > start) {
-      return JSON.parse(cleaned.slice(start, end + 1)) as T;
-    }
-    throw new Error('AI did not return valid JSON.');
-  }
+  try { return JSON.parse(cleaned) as T; } catch { /* fall through */ }
+
+  const start = cleaned.search(/[[{]/);
+  const end = Math.max(cleaned.lastIndexOf('}'), cleaned.lastIndexOf(']'));
+  const slice = start !== -1 && end > start ? cleaned.slice(start, end + 1) : cleaned;
+
+  try { return JSON.parse(slice) as T; } catch { /* fall through */ }
+  try { return JSON.parse(closeJson(slice)) as T; } catch { /* fall through */ }
+
+  throw new Error('AI did not return valid JSON.');
 }
 
 export const aiModels = { text: TEXT_MODELS[0], vision: VISION_MODELS[0] };
