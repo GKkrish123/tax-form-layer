@@ -10,7 +10,6 @@ import { previewPath } from '@/lib/jsonpath';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -80,6 +79,7 @@ export function PropertyPanel() {
   const data = useEditor((s) => s.data);
   const updateField = useEditor((s) => s.updateField);
   const updateFieldRect = useEditor((s) => s.updateFieldRect);
+  const updateActivePageFields = useEditor((s) => s.updateActivePageFields);
   const removeField = useEditor((s) => s.removeField);
 
   const field = template.pages
@@ -124,9 +124,20 @@ export function PropertyPanel() {
           />
         </Row>
         <Row label="Type">
-          <Badge variant="secondary" className="w-fit capitalize">
-            {field.type}
-          </Badge>
+          <Choice
+            value={field.type}
+            onChange={(type) => {
+              if (type === field.type) return;
+              const next = convertFieldType(field, type);
+              updateActivePageFields((fields) => fields.map((f) => (f.id === field.id ? next : f)));
+            }}
+            options={[
+              { value: 'value', label: 'Value' },
+              { value: 'checkbox', label: 'Checkbox' },
+              { value: 'comb', label: 'Comb' },
+              { value: 'repeat', label: 'Repeat' },
+            ]}
+          />
         </Row>
       </Section>
 
@@ -169,11 +180,91 @@ export function PropertyPanel() {
         />
       )}
 
-      {(field.type === 'value' || field.type === 'comb') && 'binding' in field && 'format' in field && (
+      {field.type === 'checkbox' && (
+        <Section title="Checkbox">
+          <Row label="Mark">
+            <Choice
+              value={field.mark}
+              onChange={(mark) => patch({ mark } as Partial<Field>)}
+              options={[
+                { value: 'check', label: 'Check' },
+                { value: 'cross', label: 'Cross' },
+                { value: 'fill', label: 'Fill' },
+                { value: 'text', label: 'Text' },
+              ]}
+            />
+          </Row>
+          {field.mark === 'text' && (
+            <Row label="Mark text">
+              <Input
+                value={field.markText}
+                onChange={(e) => patch({ markText: e.target.value } as Partial<Field>)}
+              />
+            </Row>
+          )}
+          <Row label="When">
+            <Input
+              value={field.checkedWhen === undefined ? '' : String(field.checkedWhen)}
+              placeholder="truthy (default)"
+              onChange={(e) => {
+                const raw = e.target.value;
+                if (raw === '') {
+                  patch({ checkedWhen: undefined } as Partial<Field>);
+                  return;
+                }
+                if (raw === 'true' || raw === 'false') {
+                  patch({ checkedWhen: raw === 'true' } as Partial<Field>);
+                  return;
+                }
+                const n = Number(raw);
+                patch({ checkedWhen: Number.isFinite(n) && raw.trim() !== '' ? n : raw } as Partial<Field>);
+              }}
+            />
+          </Row>
+        </Section>
+      )}
+
+      {field.type === 'comb' && (
+        <Section title="Comb">
+          <Row label="Cells">
+            <Input
+              type="number"
+              min={1}
+              value={field.cells}
+              onChange={(e) => patch({ cells: Math.max(1, Math.round(toFinite(e.target.value, 1))) } as Partial<Field>)}
+            />
+          </Row>
+          <Row label="Cell gap">
+            <Input
+              type="number"
+              step={0.05}
+              min={0}
+              max={0.9}
+              value={field.cellGap}
+              onChange={(e) => patch({ cellGap: Math.min(0.9, Math.max(0, toFinite(e.target.value))) } as Partial<Field>)}
+            />
+          </Row>
+          <Row label="Right align">
+            <Toggle
+              checked={field.alignRight}
+              onChange={(v) => patch({ alignRight: v } as Partial<Field>)}
+            />
+          </Row>
+        </Section>
+      )}
+
+      {field.type !== 'repeat' && 'binding' in field && (
         <Section title="Live value">
           <div className="rounded-md bg-muted px-2 py-1.5 font-mono text-xs text-foreground">
             {(() => {
               const raw = resolveBinding(field.binding, { root: data });
+              if (field.type === 'checkbox') {
+                if (raw === undefined || raw === null || raw === '') return '—';
+                const when = field.checkedWhen;
+                const checked =
+                  when === undefined ? Boolean(raw) : raw === when || String(raw) === String(when);
+                return checked ? 'checked' : 'unchecked';
+              }
               const formatted = formatValue(coerce(raw), field.format);
               return formatted !== null && formatted !== undefined && formatted !== ''
                 ? String(formatted)
@@ -593,6 +684,80 @@ function StyleEditor({ field, onChange }: { field: Field; onChange: (p: Partial<
       </Row>
     </Section>
   );
+}
+
+function convertFieldType(field: Field, type: Field['type']): Field {
+  if (field.type === type) return field;
+
+  const base = {
+    id: field.id,
+    rect: field.rect,
+    ...(field.label ? { label: field.label } : {}),
+    ...(field.boxNumber ? { boxNumber: field.boxNumber } : {}),
+    ...(field.style ? { style: field.style } : {}),
+    ...(field.condition ? { condition: field.condition } : {}),
+    ...(field.note ? { note: field.note } : {}),
+  };
+
+  const binding: Binding =
+    'binding' in field
+      ? field.binding
+      : field.type === 'repeat'
+        ? { source: 'jsonpath', path: field.itemsPath }
+        : { source: 'jsonpath', path: '$.' };
+
+  const format: FormatSpec = 'format' in field ? field.format : { type: 'none' };
+
+  switch (type) {
+    case 'value':
+      return { type, ...base, binding, format };
+    case 'checkbox':
+      return {
+        type,
+        ...base,
+        binding,
+        mark: field.type === 'checkbox' ? field.mark : 'check',
+        markText: field.type === 'checkbox' ? field.markText : 'X',
+        ...(field.type === 'checkbox' && field.checkedWhen !== undefined
+          ? { checkedWhen: field.checkedWhen }
+          : {}),
+      };
+    case 'comb':
+      return {
+        type,
+        ...base,
+        binding,
+        format,
+        cells: field.type === 'comb' ? field.cells : 9,
+        cellGap: field.type === 'comb' ? field.cellGap : 0.1,
+        alignRight: field.type === 'comb' ? field.alignRight : false,
+      };
+    case 'repeat': {
+      const itemsPath =
+        field.type === 'repeat'
+          ? field.itemsPath
+          : 'binding' in field && field.binding.source === 'jsonpath'
+            ? field.binding.path
+            : '$.';
+      const defaultChild: RepeatingGroup['fields'][number] = {
+        type: 'value',
+        id: `${field.id}_col1`,
+        rect: { x: 0, y: 0, width: 0.2, height: 0.03, rotation: 0, unit: 'fraction' },
+        binding: { source: 'jsonpath', path: '@.' },
+        format: { type: 'none' },
+      };
+      const fields =
+        field.type === 'repeat' && field.fields.length > 0 ? field.fields : [defaultChild];
+      return {
+        type,
+        ...base,
+        itemsPath,
+        rowHeight: field.type === 'repeat' ? field.rowHeight : 0.035,
+        ...(field.type === 'repeat' && field.maxRows ? { maxRows: field.maxRows } : {}),
+        fields,
+      };
+    }
+  }
 }
 
 function defaultBinding(source: Binding['source']): Binding {

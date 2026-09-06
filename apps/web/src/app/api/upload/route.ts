@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
 
   if (process.env.BLOB_READ_WRITE_TOKEN) {
     const { put } = await import('@vercel/blob');
-    const blob = await put(`uploads/${name}`, bytes, {
+    const blob = await put(`uploads/${name}`, file, {
       access: 'public',
       contentType: file.type,
     });
