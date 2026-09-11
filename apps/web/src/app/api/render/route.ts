@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import { parseTemplate } from '@tax-form-layer/spec';
 import { planTemplate } from '@tax-form-layer/engine';
 import { renderPdf } from '@tax-form-layer/engine/pdf';
+import { renderPng } from '@tax-form-layer/engine/png';
+import { loadBasePdf } from '@/lib/load-base-pdf';
 
 export const runtime = 'nodejs';
 
@@ -11,22 +11,6 @@ interface RenderBody {
   template: unknown;
   data: unknown;
   baseUrl?: string;
-}
-
-async function loadBasePdf(baseUrl: string | undefined): Promise<Uint8Array | undefined> {
-  if (!baseUrl) return undefined;
-  try {
-    if (baseUrl.startsWith('http://') || baseUrl.startsWith('https://')) {
-      const res = await fetch(baseUrl);
-      if (!res.ok) return undefined;
-      return new Uint8Array(await res.arrayBuffer());
-    }
-    const clean = baseUrl.replace(/^\/+/, '');
-    const abs = join(process.cwd(), 'public', clean);
-    return new Uint8Array(await readFile(abs));
-  } catch {
-    return undefined;
-  }
 }
 
 export async function POST(req: NextRequest) {
@@ -42,8 +26,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid template', issues: parsed.errors }, { status: 422 });
   }
 
-  const base = await loadBasePdf(body.baseUrl ?? parsed.template.medium.source);
   const plan = planTemplate(parsed.template, body.data);
+  const format = req.nextUrl.searchParams.get('format');
+
+  if (format === 'png') {
+    const png = renderPng(plan);
+    return new NextResponse(Buffer.from(png), {
+      status: 200,
+      headers: {
+        'Content-Type': 'image/png',
+        'Content-Disposition': `inline; filename="${parsed.template.id}.png"`,
+        'Cache-Control': 'no-store',
+      },
+    });
+  }
+
+  const base = await loadBasePdf(body.baseUrl ?? parsed.template.medium.source);
   const pdfBytes = await renderPdf(plan, base ? { basePdf: base } : {});
 
   return new NextResponse(Buffer.from(pdfBytes), {

@@ -51,6 +51,21 @@ export function PreviewLayer({ geom }: { geom: CanvasGeometry }) {
           return (
             <div
               key={`${op.fieldId}-${i}`}
+              title={
+                op.trace
+                  ? [
+                      op.trace.raw === undefined || op.trace.raw === null
+                        ? 'raw ∅'
+                        : `raw ${typeof op.trace.raw === 'string' ? op.trace.raw : JSON.stringify(op.trace.raw)}`,
+                      op.trace.transforms?.length
+                        ? `transforms ${op.trace.transforms.map((t) => t.op).join(' → ')}`
+                        : null,
+                      `formatted ${op.trace.formatted}`,
+                    ]
+                      .filter(Boolean)
+                      .join('\n')
+                  : undefined
+              }
               className="absolute box-border flex overflow-hidden leading-none"
               style={{
                 left,

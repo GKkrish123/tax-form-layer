@@ -55,6 +55,22 @@ describe('resolveBinding', () => {
     ).toBe(-84251);
   });
 
+  it('sums computed args', () => {
+    expect(
+      resolveBinding(
+        {
+          source: 'computed',
+          op: 'sum',
+          args: [
+            { source: 'jsonpath', path: '$.income.w2[0].box1' },
+            { source: 'jsonpath', path: '$.income.w2[1].box1' },
+          ],
+        },
+        { root: data },
+      ),
+    ).toBe(85450.75);
+  });
+
   it('resolves @-rooted paths against the row context', () => {
     expect(
       resolveBinding(

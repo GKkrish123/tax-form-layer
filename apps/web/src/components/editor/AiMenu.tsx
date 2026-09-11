@@ -39,7 +39,7 @@ async function suggestBindingPath(
   return { path, source: json.source ?? 'heuristic' };
 }
 
-export function AiMenu() {
+export function AiMenu({ compact = false }: { compact?: boolean }) {
   const addFields = useEditor((s) => s.addFields);
   const updateActivePageFields = useEditor((s) => s.updateActivePageFields);
   const aiBusy = useEditor((s) => s.aiBusy);
@@ -211,12 +211,20 @@ export function AiMenu() {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" disabled={busy} aria-busy={busy}>
+          <Button
+            variant={compact ? 'ghost' : 'outline'}
+            size={compact ? 'icon' : 'sm'}
+            disabled={busy}
+            aria-busy={busy}
+            aria-label="AI assist"
+          >
             {busy ? <Loader2 className="animate-spin" /> : <Sparkles />}
-            <span className="hidden sm:inline">
-              {scanning ? 'Scanning…' : suggesting ? 'Binding…' : 'AI'}
-            </span>
-            {!busy && <ChevronDown className="opacity-60" />}
+            {!compact && (
+              <span className="hidden xl:inline">
+                {scanning ? 'Scanning…' : suggesting ? 'Binding…' : 'AI'}
+              </span>
+            )}
+            {!compact && !busy && <ChevronDown className="opacity-60" />}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-64">

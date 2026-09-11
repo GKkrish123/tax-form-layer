@@ -2,11 +2,12 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { Loader2, MousePointerClick, Sparkles, Trash2 } from 'lucide-react';
+import { Loader2, Sparkles, Trash2 } from 'lucide-react';
 import type { Field, Binding, FormatSpec, RepeatingGroup } from '@tax-form-layer/spec';
-import { formatValue, resolveBinding, queryJsonPath } from '@tax-form-layer/engine';
+import { formatValue, resolveBinding, queryJsonPath, compileTemplate } from '@tax-form-layer/engine';
 import { useEditor } from '@/lib/store';
 import { previewPath } from '@/lib/jsonpath';
+import { IssuesList } from './IssuesList';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -18,7 +19,21 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+function IssuesEmpty() {
+  const template = useEditor((s) => s.template);
+  const data = useEditor((s) => s.data);
+  const compiled = compileTemplate(template, data);
+  const total = compiled.coverage.bound.length + compiled.coverage.missing.length;
+  return (
+    <IssuesList
+      issues={compiled.issues}
+      bound={compiled.coverage.bound.length}
+      total={total}
+    />
+  );
+}
+
+function Row({ label, children }: { label: string; children: React.ReactNode }) {  
   return (
     <div className="grid grid-cols-[84px_1fr] items-center gap-2 py-1">
       <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
@@ -76,6 +91,7 @@ export function PropertyPanel() {
   const template = useEditor((s) => s.template);
   const activePage = useEditor((s) => s.activePage);
   const selectedFieldId = useEditor((s) => s.selectedFieldId);
+  const issuesOpen = useEditor((s) => s.issuesOpen);
   const data = useEditor((s) => s.data);
   const updateField = useEditor((s) => s.updateField);
   const updateFieldRect = useEditor((s) => s.updateFieldRect);
@@ -86,15 +102,8 @@ export function PropertyPanel() {
     .find((p) => p.number === activePage)
     ?.fields.find((f) => f.id === selectedFieldId);
 
-  if (!field) {
-    return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-muted-foreground">
-        <MousePointerClick className="h-6 w-6 opacity-40" />
-        <p className="text-xs">
-          Select a field on the form to edit its position, binding, and formatting.
-        </p>
-      </div>
-    );
+  if (!field || issuesOpen) {
+    return <IssuesEmpty />;
   }
 
   const isRepeat = field.type === 'repeat';
@@ -134,6 +143,7 @@ export function PropertyPanel() {
             options={[
               { value: 'value', label: 'Value' },
               { value: 'checkbox', label: 'Checkbox' },
+              { value: 'radio', label: 'Radio' },
               { value: 'comb', label: 'Comb' },
               { value: 'repeat', label: 'Repeat' },
             ]}
@@ -265,6 +275,11 @@ export function PropertyPanel() {
                   when === undefined ? Boolean(raw) : raw === when || String(raw) === String(when);
                 return checked ? 'checked' : 'unchecked';
               }
+              if (field.type === 'radio') {
+                if (raw === undefined || raw === null || raw === '') return '—';
+                const selected = raw === field.option || String(raw) === String(field.option);
+                return selected ? 'selected' : 'unselected';
+              }
               const formatted = formatValue(coerce(raw), field.format);
               return formatted !== null && formatted !== undefined && formatted !== ''
                 ? String(formatted)
@@ -273,6 +288,85 @@ export function PropertyPanel() {
           </div>
         </Section>
       )}
+
+      {field.type === 'radio' && (
+        <Section title="Radio">
+          <Row label="Group">
+            <Input value={field.group} onChange={(e) => patch({ group: e.target.value } as Partial<Field>)} />
+          </Row>
+          <Row label="Option">
+            <Input
+              value={String(field.option)}
+              onChange={(e) => {
+                const raw = e.target.value;
+                const option =
+                  raw === 'true' ? true : raw === 'false' ? false : raw !== '' && Number.isFinite(Number(raw)) ? Number(raw) : raw;
+                patch({ option } as Partial<Field>);
+              }}
+            />
+          </Row>
+        </Section>
+      )}
+
+      {field.type !== 'repeat' && (
+        <Section title="Constraints">
+          <Row label="Required">
+            <Toggle
+              checked={Boolean(field.required)}
+              onChange={(v) => patch({ required: v || undefined } as Partial<Field>)}
+            />
+          </Row>
+          <Row label="Pattern">
+            <Input
+              value={field.pattern ?? ''}
+              placeholder="regex"
+              onChange={(e) =>
+                patch({ pattern: e.target.value || undefined } as Partial<Field>)
+              }
+            />
+          </Row>
+          <Row label="Max chars">
+            <Input
+              type="number"
+              min={1}
+              value={field.maxChars ?? ''}
+              onChange={(e) => {
+                const n = Math.round(toFinite(e.target.value));
+                patch({ maxChars: n > 0 ? n : undefined } as Partial<Field>);
+              }}
+            />
+          </Row>
+        </Section>
+      )}
+
+      <Section title="Condition">
+        <Row label="Path">
+          <Input
+            value={
+              field.condition && 'path' in field.condition ? field.condition.path : ''
+            }
+            placeholder="$.filingStatus"
+            onChange={(e) => {
+              const path = e.target.value;
+              if (!path) {
+                patch({ condition: undefined } as Partial<Field>);
+                return;
+              }
+              patch({
+                condition: {
+                  path,
+                  operator:
+                    field.condition && 'operator' in field.condition
+                      ? field.condition.operator
+                      : 'eq',
+                  value:
+                    field.condition && 'value' in field.condition ? field.condition.value : '',
+                },
+              } as Partial<Field>);
+            }}
+          />
+        </Row>
+      </Section>
 
       <StyleEditor field={field} onChange={patch} />
 
@@ -331,6 +425,59 @@ function RepeatEditor({
           }}
         />
       </Row>
+          <Row label="Overflow">
+            <Choice
+              value={field.overflow?.strategy ?? 'clip'}
+              onChange={(strategy) =>
+                onChange({
+                  overflow: {
+                    strategy,
+                    statementText: field.overflow?.statementText,
+                    statementFieldId: field.overflow?.statementFieldId,
+                  },
+                } as Partial<Field>)
+              }
+              options={[
+                { value: 'clip', label: 'Clip' },
+                { value: 'paginate', label: 'Paginate' },
+                { value: 'statement', label: 'Statement' },
+              ]}
+            />
+          </Row>
+          {(field.overflow?.strategy ?? 'clip') === 'statement' && (
+            <>
+              <Row label="Text">
+                <Input
+                  value={field.overflow?.statementText ?? ''}
+                  placeholder="See attached"
+                  onChange={(e) =>
+                    onChange({
+                      overflow: {
+                        strategy: 'statement',
+                        statementText: e.target.value,
+                        statementFieldId: field.overflow?.statementFieldId,
+                      },
+                    } as Partial<Field>)
+                  }
+                />
+              </Row>
+              <Row label="Field id">
+                <Input
+                  value={field.overflow?.statementFieldId ?? ''}
+                  placeholder="state_see_stmt"
+                  onChange={(e) =>
+                    onChange({
+                      overflow: {
+                        strategy: 'statement',
+                        statementText: field.overflow?.statementText,
+                        statementFieldId: e.target.value || undefined,
+                      },
+                    } as Partial<Field>)
+                  }
+                />
+              </Row>
+            </>
+          )}
 
       <div className="mt-2 space-y-1.5">
         <p className="text-[10px] font-medium text-muted-foreground">Live data</p>
@@ -483,6 +630,7 @@ function BindingEditor({
             { value: 'pointer', label: 'JSON Pointer' },
             { value: 'const', label: 'Constant' },
             { value: 'template', label: 'Template' },
+            { value: 'computed', label: 'Computed' },
           ]}
         />
       </Row>
@@ -555,6 +703,34 @@ function BindingEditor({
             onChange={(e) => onChange({ ...binding, template: e.target.value })}
           />
         </Row>
+      )}
+      {binding.source === 'computed' && binding.op !== 'if' && (
+        <>
+          <Row label="Op">
+            <Choice
+              value={binding.op}
+              onChange={(op) => onChange({ ...binding, op, args: binding.args } as Binding)}
+              options={['sum', 'add', 'sub', 'mul', 'div'].map((o) => ({ value: o }))}
+            />
+          </Row>
+          {(binding.args ?? []).map((arg, i) =>
+            arg.source === 'jsonpath' ? (
+              <Row key={i} label={`Arg ${i + 1}`}>
+                <Input
+                  value={arg.path}
+                  onChange={(e) => {
+                    const args = [...binding.args];
+                    args[i] = { source: 'jsonpath', path: e.target.value };
+                    onChange({ ...binding, args });
+                  }}
+                />
+              </Row>
+            ) : null,
+          )}
+        </>
+      )}
+      {binding.source === 'computed' && binding.op === 'if' && (
+        <p className="px-1 text-[10px] text-muted-foreground">If-bindings: edit condition on the field.</p>
       )}
       {binding.source === 'jsonpath' && (
         <div className="px-1 pb-1 pt-0.5 font-mono text-[10px] text-muted-foreground">
@@ -732,6 +908,16 @@ function convertFieldType(field: Field, type: Field['type']): Field {
         cellGap: field.type === 'comb' ? field.cellGap : 0.1,
         alignRight: field.type === 'comb' ? field.alignRight : false,
       };
+    case 'radio':
+      return {
+        type,
+        ...base,
+        binding,
+        group: field.type === 'radio' ? field.group : 'group',
+        option: field.type === 'radio' ? field.option : true,
+        mark: 'check',
+        markText: 'X',
+      };
     case 'repeat': {
       const itemsPath =
         field.type === 'repeat'
@@ -770,6 +956,15 @@ function defaultBinding(source: Binding['source']): Binding {
       return { source: 'const', value: '' };
     case 'template':
       return { source: 'template', template: '{$.field}' };
+    case 'computed':
+      return {
+        source: 'computed',
+        op: 'sum',
+        args: [
+          { source: 'jsonpath', path: '$.' },
+          { source: 'jsonpath', path: '$.' },
+        ],
+      };
   }
 }
 

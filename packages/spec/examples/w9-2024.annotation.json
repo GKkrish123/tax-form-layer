@@ -1,0 +1,183 @@
+{
+  "specVersion": "1.1.0",
+  "id": "irs-w9-2024",
+  "title": "IRS Form W-9 (2024) — Request for Taxpayer Identification Number",
+  "templateVersion": "1.0.0",
+  "form": {
+    "jurisdiction": "US-IRS",
+    "formNumber": "W-9",
+    "taxYear": 2024,
+    "edition": "Rev. March 2024"
+  },
+  "medium": {
+    "kind": "pdf",
+    "source": "/forms/w9-2024.pdf",
+    "dpi": 150
+  },
+  "pageSize": { "width": 612, "height": 792 },
+  "metadata": {
+    "author": "tax-form-layer",
+    "description": "W-9: tax-classification radios, SSN/EIN combs, certification checkbox.",
+    "tags": ["w9", "tin", "reference"]
+  },
+  "pages": [
+    {
+      "number": 1,
+      "backgroundRef": 0,
+      "fields": [
+        {
+          "type": "value",
+          "id": "name",
+          "label": "1 — Name of entity/individual",
+          "rect": { "x": 0.05, "y": 0.08, "width": 0.9, "height": 0.035 },
+          "binding": { "source": "jsonpath", "path": "$.name" },
+          "format": { "type": "text", "case": "upper" },
+          "style": { "fontSize": 10 }
+        },
+        {
+          "type": "value",
+          "id": "business_name",
+          "label": "2 — Business name/disregarded entity",
+          "rect": { "x": 0.05, "y": 0.14, "width": 0.9, "height": 0.035 },
+          "binding": { "source": "jsonpath", "path": "$.businessName" },
+          "format": { "type": "text" },
+          "style": { "fontSize": 10 }
+        },
+        {
+          "type": "radio",
+          "id": "class_individual",
+          "label": "Individual/sole proprietor",
+          "group": "classification",
+          "option": "individual",
+          "rect": { "x": 0.05, "y": 0.22, "width": 0.02, "height": 0.02 },
+          "binding": { "source": "jsonpath", "path": "$.classification" },
+          "mark": "cross"
+        },
+        {
+          "type": "radio",
+          "id": "class_c_corp",
+          "label": "C Corporation",
+          "group": "classification",
+          "option": "c_corp",
+          "rect": { "x": 0.28, "y": 0.22, "width": 0.02, "height": 0.02 },
+          "binding": { "source": "jsonpath", "path": "$.classification" },
+          "mark": "cross"
+        },
+        {
+          "type": "radio",
+          "id": "class_partnership",
+          "label": "Partnership",
+          "group": "classification",
+          "option": "partnership",
+          "rect": { "x": 0.51, "y": 0.22, "width": 0.02, "height": 0.02 },
+          "binding": { "source": "jsonpath", "path": "$.classification" },
+          "mark": "cross"
+        },
+        {
+          "type": "radio",
+          "id": "class_llc",
+          "label": "LLC",
+          "group": "classification",
+          "option": "llc",
+          "rect": { "x": 0.74, "y": 0.22, "width": 0.02, "height": 0.02 },
+          "binding": { "source": "jsonpath", "path": "$.classification" },
+          "mark": "cross"
+        },
+        {
+          "type": "comb",
+          "id": "ssn",
+          "label": "Social security number",
+          "rect": { "x": 0.05, "y": 0.32, "width": 0.4, "height": 0.03 },
+          "binding": { "source": "jsonpath", "path": "$.ssn" },
+          "format": { "type": "ssn" },
+          "cells": 9,
+          "cellGap": 0.08,
+          "alignRight": false,
+          "condition": { "path": "$.classification", "operator": "eq", "value": "individual" }
+        },
+        {
+          "type": "comb",
+          "id": "ein",
+          "label": "Employer identification number",
+          "rect": { "x": 0.52, "y": 0.32, "width": 0.43, "height": 0.03 },
+          "binding": { "source": "jsonpath", "path": "$.ein" },
+          "format": { "type": "ein" },
+          "cells": 10,
+          "cellGap": 0.08,
+          "alignRight": false,
+          "condition": { "path": "$.classification", "operator": "ne", "value": "individual" }
+        },
+        {
+          "type": "value",
+          "id": "address",
+          "label": "5–6 — Address, city, state, ZIP",
+          "rect": { "x": 0.05, "y": 0.4, "width": 0.9, "height": 0.07 },
+          "binding": {
+            "source": "template",
+            "template": "{$.address.street}\n{$.address.city}, {$.address.state} {$.address.zip}"
+          },
+          "format": { "type": "text" },
+          "style": { "fontSize": 9, "verticalAlign": "top", "overflow": "wrap" }
+        },
+        {
+          "type": "checkbox",
+          "id": "certify",
+          "label": "Certification",
+          "rect": { "x": 0.05, "y": 0.52, "width": 0.02, "height": 0.02 },
+          "binding": { "source": "jsonpath", "path": "$.certified" },
+          "mark": "cross",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "sampleData": {
+    "name": "Sam Ortega",
+    "businessName": "",
+    "classification": "individual",
+    "ssn": "561009988",
+    "address": {
+      "street": "88 Cedar Ave",
+      "city": "Austin",
+      "state": "TX",
+      "zip": "78701"
+    },
+    "certified": true
+  },
+  "fixtures": [
+    {
+      "id": "individual",
+      "title": "Individual (SSN)",
+      "data": {
+        "name": "Sam Ortega",
+        "businessName": "",
+        "classification": "individual",
+        "ssn": "561009988",
+        "address": {
+          "street": "88 Cedar Ave",
+          "city": "Austin",
+          "state": "TX",
+          "zip": "78701"
+        },
+        "certified": true
+      }
+    },
+    {
+      "id": "c-corp",
+      "title": "C Corporation (EIN)",
+      "data": {
+        "name": "Ortega Holdings Inc",
+        "businessName": "Ortega Holdings Inc",
+        "classification": "c_corp",
+        "ein": "561112233",
+        "address": {
+          "street": "88 Cedar Ave",
+          "city": "Austin",
+          "state": "TX",
+          "zip": "78701"
+        },
+        "certified": true
+      }
+    }
+  ]
+}

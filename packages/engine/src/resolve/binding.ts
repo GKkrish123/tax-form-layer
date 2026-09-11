@@ -1,43 +1,9 @@
-import { JSONPath } from 'jsonpath-plus';
 import type { Binding, Transform } from '@tax-form-layer/spec';
+import { queryJsonPath, queryPointer, type ResolveContext } from './query.js';
+import { evaluateCondition } from './condition.js';
 
 export type ResolvedValue = string | number | boolean | null | undefined;
-
-/** `@`-rooted paths resolve against `row` when inside a repeating group. */
-export interface ResolveContext {
-  root: unknown;
-  row?: unknown;
-}
-
-function queryJsonPath(expression: string, ctx: ResolveContext): unknown {
-  const usesRow = expression.startsWith('@');
-  const json = usesRow ? ctx.row : ctx.root;
-  const path = usesRow ? '$' + expression.slice(1) : expression;
-  if (json === undefined || json === null) return undefined;
-  const matches = JSONPath({ path, json: json as object, wrap: false });
-  // `wrap: false` returns a scalar for single matches, or an array for many.
-  return matches;
-}
-
-function queryPointer(pointer: string, json: unknown): unknown {
-  if (pointer === '' || pointer === '/') return json;
-  const parts = pointer
-    .split('/')
-    .slice(1)
-    .map((p) => p.replace(/~1/g, '/').replace(/~0/g, '~'));
-  let current: unknown = json;
-  for (const part of parts) {
-    if (current === null || current === undefined) return undefined;
-    if (Array.isArray(current)) {
-      current = current[Number(part)];
-    } else if (typeof current === 'object') {
-      current = (current as Record<string, unknown>)[part];
-    } else {
-      return undefined;
-    }
-  }
-  return current;
-}
+export type { ResolveContext };
 
 const TEMPLATE_TOKEN = /\{([^}]+)\}/g;
 
@@ -111,9 +77,72 @@ function coerceScalar(value: unknown): ResolvedValue {
   return value as ResolvedValue;
 }
 
-export function resolveBinding(binding: Binding, ctx: ResolveContext): ResolvedValue {
-  let raw: ResolvedValue;
+export interface ResolveResult {
+  value: ResolvedValue;
+  typeMismatch?: string;
+}
 
+function applyPipeline(binding: Binding, raw: ResolvedValue): ResolvedValue {
+  const isEmpty = raw === undefined || raw === null || (binding.source !== 'template' && raw === '');
+  if (isEmpty && binding.fallback !== undefined) {
+    raw = binding.fallback;
+  }
+  if (binding.transforms) {
+    for (const t of binding.transforms) {
+      raw = applyTransform(raw, t);
+    }
+  }
+  return raw;
+}
+
+function resolveComputed(binding: Binding & { source: 'computed' }, ctx: ResolveContext): ResolveResult {
+  if (binding.op === 'if') {
+    const pass = evaluateCondition(binding.condition, ctx);
+    const branch = resolveBindingDetailed(pass ? binding.then : binding.else, ctx);
+    return { value: applyPipeline(binding, branch.value), typeMismatch: branch.typeMismatch };
+  }
+
+  const nums: number[] = [];
+  let mismatch: string | undefined;
+  for (const arg of binding.args) {
+    const part = resolveBindingDetailed(arg, ctx);
+    const n = toNumber(part.value);
+    if (n === undefined) {
+      mismatch = `Computed ${binding.op} expected a number, got ${JSON.stringify(part.value)}`;
+      nums.push(0);
+    } else {
+      nums.push(n);
+    }
+  }
+
+  let value: number;
+  switch (binding.op) {
+    case 'sum':
+      value = nums.reduce((a, b) => a + b, 0);
+      break;
+    case 'add':
+      value = (nums[0] ?? 0) + (nums[1] ?? 0);
+      break;
+    case 'sub':
+      value = (nums[0] ?? 0) - (nums[1] ?? 0);
+      break;
+    case 'mul':
+      value = nums.reduce((a, b) => a * b, 1);
+      break;
+    case 'div':
+      value = nums[1] ? (nums[0] ?? 0) / nums[1] : nums[0] ?? 0;
+      break;
+  }
+
+  return { value: applyPipeline(binding, value), typeMismatch: mismatch };
+}
+
+export function resolveBindingDetailed(binding: Binding, ctx: ResolveContext): ResolveResult {
+  if (binding.source === 'computed') {
+    return resolveComputed(binding, ctx);
+  }
+
+  let raw: ResolvedValue;
   switch (binding.source) {
     case 'jsonpath':
       raw = coerceScalar(queryJsonPath(binding.path, ctx));
@@ -129,19 +158,11 @@ export function resolveBinding(binding: Binding, ctx: ResolveContext): ResolvedV
       break;
   }
 
-  const isEmpty =
-    raw === undefined || raw === null || (binding.source !== 'template' && raw === '');
-  if (isEmpty && binding.fallback !== undefined) {
-    raw = binding.fallback;
-  }
+  return { value: applyPipeline(binding, raw) };
+}
 
-  if (binding.transforms) {
-    for (const t of binding.transforms) {
-      raw = applyTransform(raw, t);
-    }
-  }
-
-  return raw;
+export function resolveBinding(binding: Binding, ctx: ResolveContext): ResolvedValue {
+  return resolveBindingDetailed(binding, ctx).value;
 }
 
 export { queryJsonPath };

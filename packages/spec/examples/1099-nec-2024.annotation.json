@@ -1,0 +1,111 @@
+{
+  "specVersion": "1.1.0",
+  "id": "irs-1099-nec-2024",
+  "title": "IRS Form 1099-NEC (2024) — Nonemployee Compensation",
+  "templateVersion": "1.0.0",
+  "form": {
+    "jurisdiction": "US-IRS",
+    "formNumber": "1099-NEC",
+    "taxYear": 2024,
+    "edition": "2024"
+  },
+  "medium": {
+    "kind": "pdf",
+    "source": "/forms/1099-nec-2024.pdf",
+    "dpi": 150
+  },
+  "pageSize": { "width": 612, "height": 792 },
+  "metadata": {
+    "author": "tax-form-layer",
+    "description": "Compact 1099-NEC annotation: comb TINs, NEC amount, withheld tax, 2nd TIN checkbox.",
+    "tags": ["1099", "nec", "reference"]
+  },
+  "pages": [
+    {
+      "number": 1,
+      "backgroundRef": 0,
+      "fields": [
+        {
+          "type": "value",
+          "id": "payer_block",
+          "label": "PAYER'S name, address, TIN",
+          "rect": { "x": 0.05, "y": 0.08, "width": 0.48, "height": 0.12 },
+          "binding": {
+            "source": "template",
+            "template": "{$.payer.name}\n{$.payer.address}\nTIN {$.payer.tin}"
+          },
+          "format": { "type": "text" },
+          "style": { "fontSize": 9, "verticalAlign": "top", "overflow": "wrap" }
+        },
+        {
+          "type": "comb",
+          "id": "recipient_tin",
+          "label": "RECIPIENT'S TIN",
+          "rect": { "x": 0.56, "y": 0.08, "width": 0.38, "height": 0.03 },
+          "binding": { "source": "jsonpath", "path": "$.recipient.tin" },
+          "format": { "type": "ein" },
+          "cells": 10,
+          "cellGap": 0.08,
+          "alignRight": false,
+          "style": { "fontSize": 11, "align": "center" }
+        },
+        {
+          "type": "value",
+          "id": "recipient_name",
+          "label": "RECIPIENT'S name",
+          "rect": { "x": 0.05, "y": 0.24, "width": 0.48, "height": 0.04 },
+          "binding": { "source": "jsonpath", "path": "$.recipient.name" },
+          "format": { "type": "text", "case": "upper" },
+          "style": { "fontSize": 10 }
+        },
+        {
+          "type": "value",
+          "id": "box1_nec",
+          "label": "1 — Nonemployee compensation",
+          "boxNumber": "1",
+          "rect": { "x": 0.56, "y": 0.18, "width": 0.38, "height": 0.04 },
+          "binding": { "source": "jsonpath", "path": "$.amounts.nec", "fallback": 0 },
+          "format": { "type": "currency" },
+          "style": { "align": "right", "fontSize": 11 }
+        },
+        {
+          "type": "value",
+          "id": "box4_withheld",
+          "label": "4 — Federal income tax withheld",
+          "boxNumber": "4",
+          "rect": { "x": 0.56, "y": 0.26, "width": 0.38, "height": 0.04 },
+          "binding": { "source": "jsonpath", "path": "$.amounts.federalWithheld", "fallback": 0 },
+          "format": { "type": "currency" },
+          "style": { "align": "right", "fontSize": 11 }
+        },
+        {
+          "type": "checkbox",
+          "id": "second_tin",
+          "label": "2nd TIN not.",
+          "rect": { "x": 0.56, "y": 0.34, "width": 0.02, "height": 0.02 },
+          "binding": { "source": "jsonpath", "path": "$.flags.secondTinNotice" },
+          "mark": "text",
+          "markText": "X"
+        }
+      ]
+    }
+  ],
+  "sampleData": {
+    "payer": {
+      "name": "Northwind Consulting LLC",
+      "address": "12 Market Street, Austin, TX 78701",
+      "tin": "741112223"
+    },
+    "recipient": {
+      "name": "Sam Ortega",
+      "tin": "561009988"
+    },
+    "amounts": {
+      "nec": 24500,
+      "federalWithheld": 0
+    },
+    "flags": {
+      "secondTinNotice": false
+    }
+  }
+}

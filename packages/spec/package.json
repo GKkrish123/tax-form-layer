@@ -9,11 +9,17 @@
     ".": "./src/index.ts",
     "./schema.json": "./generated/annotation.schema.json",
     "./examples/w2-2024": "./examples/w2-2024.annotation.json",
+    "./examples/w4-2024": "./examples/w4-2024.annotation.json",
+    "./examples/w9-2024": "./examples/w9-2024.annotation.json",
+    "./examples/1099-nec-2024": "./examples/1099-nec-2024.annotation.json",
+    "./examples/1099-int-2024": "./examples/1099-int-2024.annotation.json",
+    "./examples/1099-misc-2024": "./examples/1099-misc-2024.annotation.json",
     "./package.json": "./package.json"
   },
   "files": [
     "src",
-    "generated"
+    "generated",
+    "examples"
   ],
   "scripts": {
     "build": "tsc --noEmit",

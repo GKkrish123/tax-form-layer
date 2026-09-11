@@ -1,10 +1,13 @@
 export {
   resolveBinding,
+  resolveBindingDetailed,
   queryJsonPath,
   type ResolvedValue,
   type ResolveContext,
+  type ResolveResult,
 } from './resolve/binding.js';
 export { evaluateCondition } from './resolve/condition.js';
+export { isUnboundPath } from './resolve/query.js';
 export { formatValue } from './format/index.js';
 export {
   rectToPoints,
@@ -20,5 +23,19 @@ export {
   type LayoutResult,
   type PositionedLine,
 } from './layout/text.js';
-export { planTemplate } from './plan/plan.js';
-export type { RenderPlan, RenderPage, DrawOp, TextDrawOp, MarkDrawOp } from './plan/types.js';
+export { helveticaWidth, helveticaMeasurer } from './layout/metrics.js';
+export { planTemplate, compileTemplate, type CompileResult } from './plan/plan.js';
+export {
+  collectPaths,
+  coverage,
+  toDataJsonSchema,
+  type CoverageReport,
+} from './plan/coverage.js';
+export type {
+  RenderPlan,
+  RenderPage,
+  DrawOp,
+  TextDrawOp,
+  MarkDrawOp,
+  DrawTrace,
+} from './plan/types.js';

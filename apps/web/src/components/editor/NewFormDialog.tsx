@@ -5,6 +5,8 @@ import { toast } from 'sonner';
 import { FilePlus2, Loader2 } from 'lucide-react';
 import { useEditor } from '@/lib/store';
 import { blankTemplate } from '@/lib/blank-template';
+import { confirmDiscard } from '@/lib/unsaved';
+import { BUNDLED_EXAMPLES } from '@/lib/examples';
 import {
   Dialog,
   DialogContent,
@@ -43,10 +45,11 @@ export function NewFormDialog({
   const [taxYear, setTaxYear] = useState(new Date().getFullYear() - 1);
   const [mediumKind, setMediumKind] = useState<'pdf' | 'image'>('pdf');
   const [base, setBase] = useState<BaseChoice>('sample');
+  const [samplePdf, setSamplePdf] = useState(BUNDLED_EXAMPLES[0]!.pdf);
   const [fileName, setFileName] = useState<string | null>(null);
 
   async function resolveSource(): Promise<{ source?: string; kind: 'pdf' | 'image' }> {
-    if (base === 'sample') return { source: '/forms/w2-2024.pdf', kind: 'pdf' };
+    if (base === 'sample') return { source: samplePdf, kind: 'pdf' };
     if (base === 'blank') return { kind: mediumKind };
     const file = fileRef.current?.files?.[0];
     if (!file) throw new Error('Choose a file to upload');
@@ -62,6 +65,7 @@ export function NewFormDialog({
   }
 
   async function create() {
+    if (!confirmDiscard(useEditor.getState().dirty)) return;
     setBusy(true);
     try {
       const { source, kind } = await resolveSource();
@@ -129,12 +133,30 @@ export function NewFormDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="sample">Sample W-2 (PDF)</SelectItem>
+                <SelectItem value="sample">Sample PDF</SelectItem>
                 <SelectItem value="upload">Upload…</SelectItem>
                 <SelectItem value="blank">Blank page</SelectItem>
               </SelectContent>
             </Select>
           </div>
+
+          {base === 'sample' && (
+            <div className="space-y-1">
+              <Label>Sample form</Label>
+              <Select value={samplePdf} onValueChange={setSamplePdf}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {BUNDLED_EXAMPLES.map((ex) => (
+                    <SelectItem key={ex.id} value={ex.pdf}>
+                      {ex.formNumber}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {base === 'upload' && (
             <div className="col-span-2 space-y-1">

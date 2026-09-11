@@ -8,6 +8,6 @@
  *  - MINOR: backwards-compatible additions (new optional fields, new enum members).
  *  - PATCH: clarifications with no structural impact.
  */
-export const SPEC_VERSION = '1.0.0' as const;
+export const SPEC_VERSION = '1.1.0' as const;
 
 export type SpecVersion = typeof SPEC_VERSION;

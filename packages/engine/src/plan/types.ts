@@ -1,5 +1,14 @@
-import type { PageSize, Style } from '@tax-form-layer/spec';
+import type { Binding, PageSize, Style, Transform } from '@tax-form-layer/spec';
 import type { PointRect } from '../geometry/coordinates.js';
+
+export interface DrawTrace {
+  fieldId: string;
+  copyId?: string;
+  raw: unknown;
+  formatted: string;
+  binding?: Binding;
+  transforms?: Transform[];
+}
 
 export interface TextDrawOp {
   kind: 'text';
@@ -7,6 +16,7 @@ export interface TextDrawOp {
   rect: PointRect;
   text: string;
   style: Style;
+  trace?: DrawTrace;
 }
 
 export interface MarkDrawOp {
@@ -16,12 +26,15 @@ export interface MarkDrawOp {
   mark: 'check' | 'cross' | 'fill' | 'text';
   markText: string;
   color: string;
+  trace?: DrawTrace;
 }
 
 export type DrawOp = TextDrawOp | MarkDrawOp;
 
 export interface RenderPage {
   number: number;
+  copyId?: string;
+  copyTitle?: string;
   size: PageSize;
   backgroundRef: number | string;
   ops: DrawOp[];

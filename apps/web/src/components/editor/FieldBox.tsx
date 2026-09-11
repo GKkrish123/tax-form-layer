@@ -3,8 +3,10 @@
 import { memo, useRef } from 'react';
 import clsx from 'clsx';
 import type { Field, Rect } from '@tax-form-layer/spec';
+import type { Issue } from '@tax-form-layer/spec';
 import { resolveBinding, formatValue, queryJsonPath } from '@tax-form-layer/engine';
 import { useEditor } from '@/lib/store';
+import { snapMove } from '@/lib/snap';
 import type { CanvasGeometry } from './FormCanvas';
 
 function getBinding(field: Field): { path: string | null; isBound: boolean } {
@@ -18,6 +20,7 @@ function getBinding(field: Field): { path: string | null; isBound: boolean } {
   if (b.source === 'template') return { path: `"${b.template}"`, isBound: true };
   if (b.source === 'const')    return { path: String(b.value), isBound: true };
   if (b.source === 'pointer')  return { path: b.pointer, isBound: true };
+  if (b.source === 'computed') return { path: `computed:${b.op}`, isBound: true };
   return { path: null, isBound: false };
 }
 
@@ -48,6 +51,7 @@ const TYPE_COLORS: Record<Field['type'], string> = {
   checkbox: 'border-emerald-500/80 bg-emerald-500/10',
   comb: 'border-violet-500/80 bg-violet-500/10',
   repeat: 'border-amber-500/80 bg-amber-500/10',
+  radio: 'border-fuchsia-500/80 bg-fuchsia-500/10',
 };
 
 const LABEL_COLORS: Record<Field['type'], string> = {
@@ -55,12 +59,24 @@ const LABEL_COLORS: Record<Field['type'], string> = {
   checkbox: 'bg-emerald-600',
   comb: 'bg-violet-600',
   repeat: 'bg-amber-600',
+  radio: 'bg-fuchsia-600',
 };
 
-function FieldBoxImpl({ field, geom }: { field: Field; geom: CanvasGeometry }) {
-  const selected = useEditor((s) => s.selectedFieldId === field.id);
+function FieldBoxImpl({
+  field,
+  geom,
+  issue,
+}: {
+  field: Field;
+  geom: CanvasGeometry;
+  issue?: Issue;
+}) {
+  const selected = useEditor((s) => s.selectedFieldIds.includes(field.id));
+  const hovered = useEditor((s) => s.hoveredFieldId === field.id);
   const selectField = useEditor((s) => s.selectField);
   const updateFieldRect = useEditor((s) => s.updateFieldRect);
+  const updateField = useEditor((s) => s.updateField);
+  const setGuides = useEditor((s) => s.setGuides);
   const data = useEditor((s) => s.data);
 
   const elRef = useRef<HTMLDivElement>(null);
@@ -88,7 +104,7 @@ function FieldBoxImpl({ field, geom }: { field: Field; geom: CanvasGeometry }) {
     if (!editable) return;
     e.stopPropagation();
     e.preventDefault();
-    selectField(field.id);
+    selectField(field.id, { additive: e.shiftKey });
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     movedRef.current = false;
     liveRef.current = {
@@ -146,11 +162,19 @@ function FieldBoxImpl({ field, geom }: { field: Field; geom: CanvasGeometry }) {
 
     let next = { ...liveRef.current };
     if (st.kind === 'move') {
-      next = {
+      const raw = {
         ...next,
         x: clamp01(st.rect.x + dx),
         y: clamp01(st.rect.y + dy),
       };
+      const others = useEditor
+        .getState()
+        .template.pages.find((p) => p.number === useEditor.getState().activePage)
+        ?.fields.filter((f) => f.id !== field.id)
+        .map((f) => f.rect) ?? [];
+      const snapped = snapMove(raw, others);
+      next = snapped.rect;
+      setGuides(snapped.guides);
     } else {
       const r = st.rect;
       next = { x: r.x, y: r.y, width: r.width, height: r.height };
@@ -189,6 +213,7 @@ function FieldBoxImpl({ field, geom }: { field: Field; geom: CanvasGeometry }) {
       /* no-op */
     }
 
+    setGuides([]);
     const live = liveRef.current;
     updateFieldRect(field.id, {
       x: live.x,
@@ -249,14 +274,54 @@ function FieldBoxImpl({ field, geom }: { field: Field; geom: CanvasGeometry }) {
       onClick={(e) => {
         e.stopPropagation();
         if (movedRef.current) return;
+        selectField(field.id, { additive: e.shiftKey });
+      }}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
         selectField(field.id);
+        const path =
+          field.type !== 'repeat' && 'binding' in field && field.binding.source === 'jsonpath'
+            ? field.binding.path
+            : field.type === 'repeat'
+              ? field.itemsPath
+              : '';
+        const act = window.prompt('Action: duplicate | delete | copy-path | copy-style', 'duplicate');
+        const s = useEditor.getState();
+        if (act === 'delete') s.removeField(field.id);
+        if (act === 'duplicate') s.duplicateSelected();
+        if (act === 'copy-path' && path) void navigator.clipboard?.writeText(path);
+        if (act === 'copy-style' && field.style) {
+          const page = s.template.pages.find((p) => p.number === s.activePage);
+          const others = page?.fields.filter((f) => s.selectedFieldIds.includes(f.id) && f.id !== field.id) ?? [];
+          for (const other of others) s.updateField(other.id, { style: field.style } as Partial<Field>);
+          void navigator.clipboard?.writeText(JSON.stringify(field.style));
+        }
+      }}
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes('text/jsonpath')) e.preventDefault();
+      }}
+      onDrop={(e) => {
+        const path = e.dataTransfer.getData('text/jsonpath');
+        if (!path || field.type === 'repeat') return;
+        e.preventDefault();
+        e.stopPropagation();
+        updateField(field.id, { binding: { source: 'jsonpath', path } } as Partial<Field>);
       }}
       className={clsx(
         'field-box group absolute box-border cursor-move rounded-[3px] border',
         TYPE_COLORS[field.type],
+        issue?.code === 'TFL-BIND-001' && 'border-orange-500 bg-orange-500/15',
+        issue?.code === 'TFL-BIND-002' && 'border-amber-500 bg-amber-500/15',
+        (issue?.code === 'TFL-OVR-001' ||
+          issue?.code === 'TFL-OVR-002' ||
+          issue?.code === 'TFL-OVR-003') &&
+          'border-rose-500 bg-rose-500/15',
+        issue?.code === 'TFL-CON-001' && 'border-red-500 bg-red-500/15',
         selected
           ? 'z-10 border-transparent ring-2 ring-primary ring-offset-1'
           : 'hover:shadow-md hover:ring-1 hover:ring-slate-400/50',
+        hovered && !selected && 'ring-1 ring-primary/50',
         !editable && 'cursor-not-allowed opacity-70',
       )}
       style={{ left, top, width, height }}
@@ -276,6 +341,15 @@ function FieldBoxImpl({ field, geom }: { field: Field; geom: CanvasGeometry }) {
         {field.boxNumber ? `${field.boxNumber} · ` : ''}
         {field.label ?? field.id}
       </span>
+
+      {issue && (
+        <span
+          className="pointer-events-none absolute -right-1 -top-1 z-20 rounded bg-rose-600 px-1 text-[8px] font-bold text-white"
+          title={issue.message}
+        >
+          !
+        </span>
+      )}
 
       {bindingPath !== null && (
         <span
@@ -361,6 +435,9 @@ export const FieldBox = memo(FieldBoxImpl, (prev, next) => {
     prev.geom.height !== next.geom.height ||
     prev.geom.scale !== next.geom.scale
   ) {
+    return false;
+  }
+  if (prev.issue?.code !== next.issue?.code || prev.issue?.message !== next.issue?.message) {
     return false;
   }
   if (prev.field === next.field) return true;

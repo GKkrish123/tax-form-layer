@@ -3,26 +3,13 @@ import { Rect } from './geometry.js';
 import { Binding } from './binding.js';
 import { FormatSpec } from './format.js';
 import { Style } from './style.js';
+import { Condition } from './condition.js';
 
-export const Condition = z
-  .object({
-    path: z.string().min(1),
-    operator: z.enum([
-      'exists',
-      'notExists',
-      'truthy',
-      'falsy',
-      'eq',
-      'ne',
-      'gt',
-      'lt',
-      'gte',
-      'lte',
-    ]),
-    value: z.union([z.string(), z.number(), z.boolean()]).optional(),
-  })
-  .strict();
-export type Condition = z.infer<typeof Condition>;
+const constraints = {
+  required: z.boolean().optional(),
+  pattern: z.string().optional(),
+  maxChars: z.number().int().positive().optional(),
+};
 
 const fieldBase = {
   id: z.string().min(1),
@@ -32,6 +19,7 @@ const fieldBase = {
   style: Style.optional(),
   condition: Condition.optional(),
   note: z.string().optional(),
+  ...constraints,
 };
 
 export const ValueField = z
@@ -72,6 +60,34 @@ export const CombField = z
   .strict();
 export type CombField = z.infer<typeof CombField>;
 
+export const RadioField = z
+  .object({
+    type: z.literal('radio'),
+    ...fieldBase,
+    group: z.string().min(1),
+    option: z.union([z.string(), z.number(), z.boolean()]),
+    binding: Binding,
+    mark: CheckMark.default('check'),
+    markText: z.string().default('X'),
+  })
+  .strict();
+export type RadioField = z.infer<typeof RadioField>;
+
+export const RepeatOverflow = z
+  .object({
+    strategy: z.enum(['clip', 'paginate', 'statement']).default('clip'),
+    statementText: z.string().optional(),
+    statementFieldId: z.string().optional(),
+  })
+  .strict();
+export type RepeatOverflow = z.infer<typeof RepeatOverflow>;
+
+export type ScalarField = ValueField | CheckboxField | CombField | RadioField;
+
+const ScalarFieldSchema = z.lazy(() =>
+  z.discriminatedUnion('type', [ValueField, CheckboxField, CombField, RadioField]),
+) as z.ZodType<ScalarField>;
+
 export const RepeatingGroup = z
   .object({
     type: z.literal('repeat'),
@@ -79,8 +95,9 @@ export const RepeatingGroup = z
     itemsPath: z.string().min(1),
     rowHeight: z.number().positive(),
     maxRows: z.number().int().positive().optional(),
+    overflow: RepeatOverflow.optional(),
     /** Child bindings use `@` as the row root, e.g. `@.amount`. Rects are relative to the group. */
-    fields: z.array(z.union([ValueField, CheckboxField, CombField])).min(1),
+    fields: z.array(ScalarFieldSchema).min(1),
   })
   .strict();
 export type RepeatingGroup = z.infer<typeof RepeatingGroup>;
@@ -89,6 +106,7 @@ export const Field = z.discriminatedUnion('type', [
   ValueField,
   CheckboxField,
   CombField,
+  RadioField,
   RepeatingGroup,
 ]);
 export type Field = z.infer<typeof Field>;

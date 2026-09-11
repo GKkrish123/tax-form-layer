@@ -1,0 +1,165 @@
+{
+  "specVersion": "1.1.0",
+  "id": "irs-w4-2024",
+  "title": "IRS Form W-4 (2024) — Employee's Withholding Certificate",
+  "templateVersion": "1.0.0",
+  "form": {
+    "jurisdiction": "US-IRS",
+    "formNumber": "W-4",
+    "taxYear": 2024,
+    "edition": "2024"
+  },
+  "medium": {
+    "kind": "pdf",
+    "source": "/forms/w4-2024.pdf",
+    "dpi": 150
+  },
+  "pageSize": { "width": 612, "height": 792 },
+  "metadata": {
+    "author": "tax-form-layer",
+    "description": "W-4: filing-status radios and spouse fields gated by compound MFJ conditions.",
+    "tags": ["w4", "withholding", "reference"]
+  },
+  "pages": [
+    {
+      "number": 1,
+      "backgroundRef": 0,
+      "fields": [
+        {
+          "type": "value",
+          "id": "employee_name",
+          "label": "First name and middle initial / Last name",
+          "rect": { "x": 0.05, "y": 0.08, "width": 0.48, "height": 0.035 },
+          "binding": {
+            "source": "template",
+            "template": "{$.employee.firstName} {$.employee.lastName}"
+          },
+          "format": { "type": "text", "case": "upper" },
+          "style": { "fontSize": 10 }
+        },
+        {
+          "type": "comb",
+          "id": "employee_ssn",
+          "label": "Social security number",
+          "required": true,
+          "rect": { "x": 0.56, "y": 0.08, "width": 0.39, "height": 0.035 },
+          "binding": { "source": "jsonpath", "path": "$.employee.ssn" },
+          "format": { "type": "ssn" },
+          "cells": 9,
+          "cellGap": 0.08,
+          "alignRight": false
+        },
+        {
+          "type": "radio",
+          "id": "status_s",
+          "label": "Single or Married filing separately",
+          "group": "filingStatus",
+          "option": "S",
+          "rect": { "x": 0.05, "y": 0.18, "width": 0.02, "height": 0.02 },
+          "binding": { "source": "jsonpath", "path": "$.filingStatus" },
+          "mark": "cross"
+        },
+        {
+          "type": "radio",
+          "id": "status_mfj",
+          "label": "Married filing jointly",
+          "group": "filingStatus",
+          "option": "MFJ",
+          "rect": { "x": 0.38, "y": 0.18, "width": 0.02, "height": 0.02 },
+          "binding": { "source": "jsonpath", "path": "$.filingStatus" },
+          "mark": "cross"
+        },
+        {
+          "type": "radio",
+          "id": "status_hoh",
+          "label": "Head of household",
+          "group": "filingStatus",
+          "option": "HOH",
+          "rect": { "x": 0.71, "y": 0.18, "width": 0.02, "height": 0.02 },
+          "binding": { "source": "jsonpath", "path": "$.filingStatus" },
+          "mark": "cross"
+        },
+        {
+          "type": "value",
+          "id": "spouse_name",
+          "label": "Spouse name (Step 1, if MFJ)",
+          "rect": { "x": 0.05, "y": 0.26, "width": 0.48, "height": 0.035 },
+          "binding": {
+            "source": "template",
+            "template": "{$.spouse.firstName} {$.spouse.lastName}"
+          },
+          "format": { "type": "text", "case": "upper" },
+          "style": { "fontSize": 10 },
+          "condition": { "path": "$.filingStatus", "operator": "eq", "value": "MFJ" }
+        },
+        {
+          "type": "comb",
+          "id": "spouse_ssn",
+          "label": "Spouse SSN",
+          "rect": { "x": 0.56, "y": 0.26, "width": 0.39, "height": 0.035 },
+          "binding": { "source": "jsonpath", "path": "$.spouse.ssn" },
+          "format": { "type": "ssn" },
+          "cells": 9,
+          "cellGap": 0.08,
+          "alignRight": false,
+          "condition": {
+            "all": [
+              { "path": "$.filingStatus", "operator": "eq", "value": "MFJ" },
+              { "path": "$.spouse.ssn", "operator": "exists" }
+            ]
+          }
+        },
+        {
+          "type": "value",
+          "id": "dependents_credit",
+          "label": "3 — Claim dependents",
+          "boxNumber": "3",
+          "rect": { "x": 0.56, "y": 0.36, "width": 0.39, "height": 0.035 },
+          "binding": { "source": "jsonpath", "path": "$.dependentsCredit", "fallback": 0 },
+          "format": { "type": "currency" },
+          "style": { "align": "right", "fontSize": 10 }
+        },
+        {
+          "type": "value",
+          "id": "extra_withholding",
+          "label": "4c — Extra withholding",
+          "boxNumber": "4c",
+          "rect": { "x": 0.56, "y": 0.44, "width": 0.39, "height": 0.035 },
+          "binding": { "source": "jsonpath", "path": "$.extraWithholding", "fallback": 0 },
+          "format": { "type": "currency" },
+          "style": { "align": "right", "fontSize": 10 }
+        }
+      ]
+    }
+  ],
+  "sampleData": {
+    "employee": { "firstName": "Jordan", "lastName": "Rivera", "ssn": "123456789" },
+    "filingStatus": "MFJ",
+    "spouse": { "firstName": "Alex", "lastName": "Rivera", "ssn": "987654321" },
+    "dependentsCredit": 2000,
+    "extraWithholding": 50
+  },
+  "fixtures": [
+    {
+      "id": "complete",
+      "title": "Complete (MFJ)",
+      "data": {
+        "employee": { "firstName": "Jordan", "lastName": "Rivera", "ssn": "123456789" },
+        "filingStatus": "MFJ",
+        "spouse": { "firstName": "Alex", "lastName": "Rivera", "ssn": "987654321" },
+        "dependentsCredit": 2000,
+        "extraWithholding": 50
+      }
+    },
+    {
+      "id": "single",
+      "title": "Single (spouse skipped)",
+      "data": {
+        "employee": { "firstName": "Jordan", "lastName": "Rivera", "ssn": "123456789" },
+        "filingStatus": "S",
+        "dependentsCredit": 0,
+        "extraWithholding": 0
+      }
+    }
+  ]
+}

@@ -1,8 +1,8 @@
 {
-  "specVersion": "1.0.0",
+  "specVersion": "1.1.0",
   "id": "irs-w2-2024",
   "title": "IRS Form W-2 (2024) — Wage and Tax Statement",
-  "templateVersion": "1.0.0",
+  "templateVersion": "1.1.0",
   "form": {
     "jurisdiction": "US-IRS",
     "formNumber": "W-2",
@@ -11,14 +11,27 @@
   },
   "medium": {
     "kind": "pdf",
+    "source": "/forms/w2-2024.pdf",
     "dpi": 150
   },
   "pageSize": { "width": 612, "height": 792 },
   "metadata": {
     "author": "tax-form-layer",
-    "description": "Reference annotation demonstrating value, currency, ssn/ein, checkbox, comb, and repeating-group fields.",
+    "description": "Reference annotation: computed wages, statutory radios, Copy B/C pack, state-row overflow statement, and dataset fixtures.",
     "tags": ["w2", "wages", "reference"]
   },
+  "copies": [
+    {
+      "id": "B",
+      "title": "Copy B — To Be Filed With Employee's FEDERAL Tax Return",
+      "pageFilter": [1]
+    },
+    {
+      "id": "C",
+      "title": "Copy C — For EMPLOYEE'S RECORDS",
+      "pageFilter": [1]
+    }
+  ],
   "pages": [
     {
       "number": 1,
@@ -29,6 +42,7 @@
           "id": "employee_ssn",
           "label": "Box a — Employee's SSN",
           "boxNumber": "a",
+          "required": true,
           "rect": { "x": 0.05, "y": 0.06, "width": 0.32, "height": 0.03 },
           "binding": { "source": "jsonpath", "path": "$.employee.ssn" },
           "format": { "type": "ssn" },
@@ -76,7 +90,14 @@
           "label": "Box 1 — Wages, tips, other comp.",
           "boxNumber": "1",
           "rect": { "x": 0.5, "y": 0.06, "width": 0.22, "height": 0.03 },
-          "binding": { "source": "jsonpath", "path": "$.boxes.box1", "fallback": 0 },
+          "binding": {
+            "source": "computed",
+            "op": "sum",
+            "args": [
+              { "source": "jsonpath", "path": "$.wages.base" },
+              { "source": "jsonpath", "path": "$.wages.tips" }
+            ]
+          },
           "format": { "type": "currency" },
           "style": { "align": "right", "fontSize": 10 }
         },
@@ -120,6 +141,35 @@
           "mark": "cross"
         },
         {
+          "type": "radio",
+          "id": "statutory_yes",
+          "label": "Statutory employee — Yes",
+          "group": "statutory",
+          "option": true,
+          "rect": { "x": 0.54, "y": 0.34, "width": 0.02, "height": 0.02 },
+          "binding": { "source": "jsonpath", "path": "$.boxes.box13.statutoryEmployee" },
+          "mark": "cross"
+        },
+        {
+          "type": "radio",
+          "id": "statutory_no",
+          "label": "Statutory employee — No",
+          "group": "statutory",
+          "option": false,
+          "rect": { "x": 0.62, "y": 0.34, "width": 0.02, "height": 0.02 },
+          "binding": { "source": "jsonpath", "path": "$.boxes.box13.statutoryEmployee" },
+          "mark": "cross"
+        },
+        {
+          "type": "value",
+          "id": "state_see_stmt",
+          "label": "See statement",
+          "rect": { "x": 0.05, "y": 0.94, "width": 0.4, "height": 0.02 },
+          "binding": { "source": "const", "value": "" },
+          "format": { "type": "text" },
+          "style": { "fontSize": 8, "color": "#334155" }
+        },
+        {
           "type": "repeat",
           "id": "state_rows",
           "label": "Boxes 15-17 — State tax (repeating)",
@@ -127,6 +177,11 @@
           "itemsPath": "$.state",
           "rowHeight": 0.035,
           "maxRows": 2,
+          "overflow": {
+            "strategy": "statement",
+            "statementText": "See attached",
+            "statementFieldId": "state_see_stmt"
+          },
           "fields": [
             {
               "type": "value",
@@ -175,16 +230,92 @@
         "zip": "94304"
       }
     },
+    "wages": { "base": 80000, "tips": 4250.75 },
     "boxes": {
-      "box1": 84250.75,
       "box2": 12630.11,
       "box3": 84250.75,
       "box4": 5223.55,
-      "box13": { "retirementPlan": true }
+      "box13": { "retirementPlan": true, "statutoryEmployee": false }
     },
     "state": [
       { "code": "CA", "wages": 84250.75, "tax": 4102.33 },
       { "code": "NY", "wages": 0, "tax": 0 }
     ]
-  }
+  },
+  "fixtures": [
+    {
+      "id": "complete",
+      "title": "Complete",
+      "data": {
+        "employee": {
+          "firstName": "Jordan",
+          "lastName": "Rivera",
+          "ssn": "123456789"
+        },
+        "employer": {
+          "name": "Acme Robotics, Inc.",
+          "ein": "981234567",
+          "address": {
+            "street": "500 Innovation Way",
+            "city": "Palo Alto",
+            "state": "CA",
+            "zip": "94304"
+          }
+        },
+        "wages": { "base": 80000, "tips": 4250.75 },
+        "boxes": {
+          "box2": 12630.11,
+          "box3": 84250.75,
+          "box4": 5223.55,
+          "box13": { "retirementPlan": true, "statutoryEmployee": false }
+        },
+        "state": [
+          { "code": "CA", "wages": 84250.75, "tax": 4102.33 },
+          { "code": "NY", "wages": 0, "tax": 0 }
+        ]
+      }
+    },
+    {
+      "id": "incomplete",
+      "title": "Incomplete",
+      "data": {
+        "employee": { "firstName": "Jordan" },
+        "boxes": { "box13": { "retirementPlan": false } }
+      }
+    },
+    {
+      "id": "overflow",
+      "title": "Overflow",
+      "data": {
+        "employee": {
+          "firstName": "Jordan Alexander Maximilian",
+          "lastName": "Rivera-Montgomery",
+          "ssn": "123456789"
+        },
+        "employer": {
+          "name": "Acme Robotics, Inc.",
+          "ein": "981234567",
+          "address": {
+            "street": "500 Innovation Way",
+            "city": "Palo Alto",
+            "state": "CA",
+            "zip": "94304"
+          }
+        },
+        "wages": { "base": 80000, "tips": 4250.75 },
+        "boxes": {
+          "box2": 12630.11,
+          "box3": 84250.75,
+          "box4": 5223.55,
+          "box13": { "retirementPlan": true, "statutoryEmployee": true }
+        },
+        "state": [
+          { "code": "CA", "wages": 84250.75, "tax": 4102.33 },
+          { "code": "NY", "wages": 12000, "tax": 800 },
+          { "code": "TX", "wages": 5000, "tax": 0 },
+          { "code": "WA", "wages": 2500, "tax": 0 }
+        ]
+      }
+    }
+  ]
 }

@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://tax-form-layer.dev/schema/1.0.0/annotation.schema.json",
-  "title": "Tax Form Annotation Spec v1.0.0",
+  "$id": "https://tax-form-layer.dev/schema/1.1.0/annotation.schema.json",
+  "title": "Tax Form Annotation Spec v1.1.0",
   "$ref": "#/definitions/FormTemplate",
   "definitions": {
     "FormTemplate": {
@@ -42,7 +42,11 @@
               "type": "string"
             }
           },
-          "required": ["jurisdiction", "formNumber", "taxYear"],
+          "required": [
+            "jurisdiction",
+            "formNumber",
+            "taxYear"
+          ],
           "additionalProperties": false
         },
         "medium": {
@@ -50,7 +54,10 @@
           "properties": {
             "kind": {
               "type": "string",
-              "enum": ["pdf", "image"]
+              "enum": [
+                "pdf",
+                "image"
+              ]
             },
             "source": {
               "type": "string"
@@ -61,7 +68,9 @@
               "default": 150
             }
           },
-          "required": ["kind"],
+          "required": [
+            "kind"
+          ],
           "additionalProperties": false
         },
         "pageSize": {
@@ -151,11 +160,20 @@
                             },
                             "unit": {
                               "type": "string",
-                              "enum": ["fraction", "pt", "px"],
+                              "enum": [
+                                "fraction",
+                                "pt",
+                                "px"
+                              ],
                               "default": "fraction"
                             }
                           },
-                          "required": ["x", "y", "width", "height"],
+                          "required": [
+                            "x",
+                            "y",
+                            "width",
+                            "height"
+                          ],
                           "additionalProperties": false
                         },
                         "style": {
@@ -196,12 +214,20 @@
                             },
                             "align": {
                               "type": "string",
-                              "enum": ["left", "center", "right"],
+                              "enum": [
+                                "left",
+                                "center",
+                                "right"
+                              ],
                               "default": "left"
                             },
                             "verticalAlign": {
                               "type": "string",
-                              "enum": ["top", "middle", "bottom"],
+                              "enum": [
+                                "top",
+                                "middle",
+                                "bottom"
+                              ],
                               "default": "middle"
                             },
                             "letterSpacing": {
@@ -215,7 +241,12 @@
                             },
                             "overflow": {
                               "type": "string",
-                              "enum": ["clip", "shrink", "ellipsis", "wrap"],
+                              "enum": [
+                                "clip",
+                                "shrink",
+                                "ellipsis",
+                                "wrap"
+                              ],
                               "default": "shrink"
                             },
                             "padding": {
@@ -244,36 +275,101 @@
                           "additionalProperties": false
                         },
                         "condition": {
-                          "type": "object",
-                          "properties": {
-                            "path": {
-                              "type": "string",
-                              "minLength": 1
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "path": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "operator": {
+                                  "type": "string",
+                                  "enum": [
+                                    "exists",
+                                    "notExists",
+                                    "truthy",
+                                    "falsy",
+                                    "eq",
+                                    "ne",
+                                    "gt",
+                                    "lt",
+                                    "gte",
+                                    "lte"
+                                  ]
+                                },
+                                "value": {
+                                  "type": [
+                                    "string",
+                                    "number",
+                                    "boolean"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "path",
+                                "operator"
+                              ],
+                              "additionalProperties": false
                             },
-                            "operator": {
-                              "type": "string",
-                              "enum": [
-                                "exists",
-                                "notExists",
-                                "truthy",
-                                "falsy",
-                                "eq",
-                                "ne",
-                                "gt",
-                                "lt",
-                                "gte",
-                                "lte"
-                              ]
+                            {
+                              "type": "object",
+                              "properties": {
+                                "all": {
+                                  "type": "array",
+                                  "items": {
+                                    "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/condition"
+                                  },
+                                  "minItems": 1
+                                }
+                              },
+                              "required": [
+                                "all"
+                              ],
+                              "additionalProperties": false
                             },
-                            "value": {
-                              "type": ["string", "number", "boolean"]
+                            {
+                              "type": "object",
+                              "properties": {
+                                "any": {
+                                  "type": "array",
+                                  "items": {
+                                    "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/condition"
+                                  },
+                                  "minItems": 1
+                                }
+                              },
+                              "required": [
+                                "any"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "not": {
+                                  "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/condition"
+                                }
+                              },
+                              "required": [
+                                "not"
+                              ],
+                              "additionalProperties": false
                             }
-                          },
-                          "required": ["path", "operator"],
-                          "additionalProperties": false
+                          ]
                         },
                         "note": {
                           "type": "string"
+                        },
+                        "required": {
+                          "type": "boolean"
+                        },
+                        "pattern": {
+                          "type": "string"
+                        },
+                        "maxChars": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0
                         },
                         "binding": {
                           "anyOf": [
@@ -289,7 +385,12 @@
                                   "minLength": 1
                                 },
                                 "fallback": {
-                                  "type": ["string", "number", "boolean", "null"]
+                                  "type": [
+                                    "string",
+                                    "number",
+                                    "boolean",
+                                    "null"
+                                  ]
                                 },
                                 "transforms": {
                                   "type": "array",
@@ -303,7 +404,9 @@
                                             "const": "trim"
                                           }
                                         },
-                                        "required": ["op"],
+                                        "required": [
+                                          "op"
+                                        ],
                                         "additionalProperties": false
                                       },
                                       {
@@ -314,7 +417,9 @@
                                             "const": "uppercase"
                                           }
                                         },
-                                        "required": ["op"],
+                                        "required": [
+                                          "op"
+                                        ],
                                         "additionalProperties": false
                                       },
                                       {
@@ -325,7 +430,9 @@
                                             "const": "lowercase"
                                           }
                                         },
-                                        "required": ["op"],
+                                        "required": [
+                                          "op"
+                                        ],
                                         "additionalProperties": false
                                       },
                                       {
@@ -336,7 +443,9 @@
                                             "const": "abs"
                                           }
                                         },
-                                        "required": ["op"],
+                                        "required": [
+                                          "op"
+                                        ],
                                         "additionalProperties": false
                                       },
                                       {
@@ -347,7 +456,9 @@
                                             "const": "negate"
                                           }
                                         },
-                                        "required": ["op"],
+                                        "required": [
+                                          "op"
+                                        ],
                                         "additionalProperties": false
                                       },
                                       {
@@ -363,7 +474,9 @@
                                             "default": 0
                                           }
                                         },
-                                        "required": ["op"],
+                                        "required": [
+                                          "op"
+                                        ],
                                         "additionalProperties": false
                                       },
                                       {
@@ -377,7 +490,10 @@
                                             "type": "number"
                                           }
                                         },
-                                        "required": ["op", "by"],
+                                        "required": [
+                                          "op",
+                                          "by"
+                                        ],
                                         "additionalProperties": false
                                       },
                                       {
@@ -391,7 +507,10 @@
                                             "type": "number"
                                           }
                                         },
-                                        "required": ["op", "by"],
+                                        "required": [
+                                          "op",
+                                          "by"
+                                        ],
                                         "additionalProperties": false
                                       },
                                       {
@@ -408,7 +527,10 @@
                                             "type": "integer"
                                           }
                                         },
-                                        "required": ["op", "start"],
+                                        "required": [
+                                          "op",
+                                          "start"
+                                        ],
                                         "additionalProperties": false
                                       },
                                       {
@@ -429,7 +551,11 @@
                                             "default": false
                                           }
                                         },
-                                        "required": ["op", "pattern", "replacement"],
+                                        "required": [
+                                          "op",
+                                          "pattern",
+                                          "replacement"
+                                        ],
                                         "additionalProperties": false
                                       },
                                       {
@@ -440,17 +566,27 @@
                                             "const": "coalesce"
                                           },
                                           "value": {
-                                            "type": ["string", "number", "boolean"]
+                                            "type": [
+                                              "string",
+                                              "number",
+                                              "boolean"
+                                            ]
                                           }
                                         },
-                                        "required": ["op", "value"],
+                                        "required": [
+                                          "op",
+                                          "value"
+                                        ],
                                         "additionalProperties": false
                                       }
                                     ]
                                   }
                                 }
                               },
-                              "required": ["source", "path"],
+                              "required": [
+                                "source",
+                                "path"
+                              ],
                               "additionalProperties": false
                             },
                             {
@@ -471,7 +607,10 @@
                                   "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/binding/anyOf/0/properties/transforms"
                                 }
                               },
-                              "required": ["source", "pointer"],
+                              "required": [
+                                "source",
+                                "pointer"
+                              ],
                               "additionalProperties": false
                             },
                             {
@@ -482,7 +621,11 @@
                                   "const": "const"
                                 },
                                 "value": {
-                                  "type": ["string", "number", "boolean"]
+                                  "type": [
+                                    "string",
+                                    "number",
+                                    "boolean"
+                                  ]
                                 },
                                 "fallback": {
                                   "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/binding/anyOf/0/properties/fallback"
@@ -491,7 +634,10 @@
                                   "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/binding/anyOf/0/properties/transforms"
                                 }
                               },
-                              "required": ["source", "value"],
+                              "required": [
+                                "source",
+                                "value"
+                              ],
                               "additionalProperties": false
                             },
                             {
@@ -512,7 +658,84 @@
                                   "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/binding/anyOf/0/properties/transforms"
                                 }
                               },
-                              "required": ["source", "template"],
+                              "required": [
+                                "source",
+                                "template"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "source": {
+                                  "type": "string",
+                                  "const": "computed"
+                                },
+                                "op": {
+                                  "type": "string",
+                                  "enum": [
+                                    "sum",
+                                    "add",
+                                    "sub",
+                                    "mul",
+                                    "div"
+                                  ]
+                                },
+                                "args": {
+                                  "type": "array",
+                                  "items": {
+                                    "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/binding"
+                                  },
+                                  "minItems": 1
+                                },
+                                "fallback": {
+                                  "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/binding/anyOf/0/properties/fallback"
+                                },
+                                "transforms": {
+                                  "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/binding/anyOf/0/properties/transforms"
+                                }
+                              },
+                              "required": [
+                                "source",
+                                "op",
+                                "args"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "source": {
+                                  "type": "string",
+                                  "const": "computed"
+                                },
+                                "op": {
+                                  "type": "string",
+                                  "const": "if"
+                                },
+                                "condition": {
+                                  "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/condition"
+                                },
+                                "then": {
+                                  "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/binding"
+                                },
+                                "else": {
+                                  "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/binding"
+                                },
+                                "fallback": {
+                                  "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/binding/anyOf/0/properties/fallback"
+                                },
+                                "transforms": {
+                                  "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/binding/anyOf/0/properties/transforms"
+                                }
+                              },
+                              "required": [
+                                "source",
+                                "op",
+                                "condition",
+                                "then",
+                                "else"
+                              ],
                               "additionalProperties": false
                             }
                           ]
@@ -527,7 +750,9 @@
                                   "const": "none"
                                 }
                               },
-                              "required": ["type"],
+                              "required": [
+                                "type"
+                              ],
                               "additionalProperties": false
                             },
                             {
@@ -539,7 +764,12 @@
                                 },
                                 "case": {
                                   "type": "string",
-                                  "enum": ["upper", "lower", "title", "none"],
+                                  "enum": [
+                                    "upper",
+                                    "lower",
+                                    "title",
+                                    "none"
+                                  ],
                                   "default": "none"
                                 },
                                 "maxLength": {
@@ -547,7 +777,9 @@
                                   "exclusiveMinimum": 0
                                 }
                               },
-                              "required": ["type"],
+                              "required": [
+                                "type"
+                              ],
                               "additionalProperties": false
                             },
                             {
@@ -583,14 +815,20 @@
                                 },
                                 "negative": {
                                   "type": "string",
-                                  "enum": ["minus", "parentheses", "none"],
+                                  "enum": [
+                                    "minus",
+                                    "parentheses",
+                                    "none"
+                                  ],
                                   "default": "parentheses"
                                 },
                                 "zeroAs": {
                                   "type": "string"
                                 }
                               },
-                              "required": ["type"],
+                              "required": [
+                                "type"
+                              ],
                               "additionalProperties": false
                             },
                             {
@@ -619,7 +857,9 @@
                                   "default": "minus"
                                 }
                               },
-                              "required": ["type"],
+                              "required": [
+                                "type"
+                              ],
                               "additionalProperties": false
                             },
                             {
@@ -644,7 +884,9 @@
                                   "default": false
                                 }
                               },
-                              "required": ["type"],
+                              "required": [
+                                "type"
+                              ],
                               "additionalProperties": false
                             },
                             {
@@ -666,7 +908,9 @@
                                   "default": "en-US"
                                 }
                               },
-                              "required": ["type"],
+                              "required": [
+                                "type"
+                              ],
                               "additionalProperties": false
                             },
                             {
@@ -681,7 +925,9 @@
                                   "default": false
                                 }
                               },
-                              "required": ["type"],
+                              "required": [
+                                "type"
+                              ],
                               "additionalProperties": false
                             },
                             {
@@ -692,7 +938,9 @@
                                   "const": "ein"
                                 }
                               },
-                              "required": ["type"],
+                              "required": [
+                                "type"
+                              ],
                               "additionalProperties": false
                             },
                             {
@@ -703,7 +951,9 @@
                                   "const": "phone"
                                 }
                               },
-                              "required": ["type"],
+                              "required": [
+                                "type"
+                              ],
                               "additionalProperties": false
                             },
                             {
@@ -722,7 +972,9 @@
                                   "default": ""
                                 }
                               },
-                              "required": ["type"],
+                              "required": [
+                                "type"
+                              ],
                               "additionalProperties": false
                             }
                           ],
@@ -731,7 +983,12 @@
                           }
                         }
                       },
-                      "required": ["type", "id", "rect", "binding"],
+                      "required": [
+                        "type",
+                        "id",
+                        "rect",
+                        "binding"
+                      ],
                       "additionalProperties": false
                     },
                     {
@@ -762,23 +1019,46 @@
                         "note": {
                           "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/note"
                         },
+                        "required": {
+                          "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/required"
+                        },
+                        "pattern": {
+                          "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/pattern"
+                        },
+                        "maxChars": {
+                          "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/maxChars"
+                        },
                         "binding": {
                           "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/binding"
                         },
                         "mark": {
                           "type": "string",
-                          "enum": ["check", "cross", "fill", "text"],
+                          "enum": [
+                            "check",
+                            "cross",
+                            "fill",
+                            "text"
+                          ],
                           "default": "check"
                         },
                         "checkedWhen": {
-                          "type": ["string", "number", "boolean"]
+                          "type": [
+                            "string",
+                            "number",
+                            "boolean"
+                          ]
                         },
                         "markText": {
                           "type": "string",
                           "default": "X"
                         }
                       },
-                      "required": ["type", "id", "rect", "binding"],
+                      "required": [
+                        "type",
+                        "id",
+                        "rect",
+                        "binding"
+                      ],
                       "additionalProperties": false
                     },
                     {
@@ -809,6 +1089,15 @@
                         "note": {
                           "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/note"
                         },
+                        "required": {
+                          "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/required"
+                        },
+                        "pattern": {
+                          "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/pattern"
+                        },
+                        "maxChars": {
+                          "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/maxChars"
+                        },
                         "binding": {
                           "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/binding"
                         },
@@ -833,7 +1122,83 @@
                           "default": false
                         }
                       },
-                      "required": ["type", "id", "rect", "binding", "cells"],
+                      "required": [
+                        "type",
+                        "id",
+                        "rect",
+                        "binding",
+                        "cells"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "radio"
+                        },
+                        "id": {
+                          "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/id"
+                        },
+                        "label": {
+                          "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/label"
+                        },
+                        "boxNumber": {
+                          "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/boxNumber"
+                        },
+                        "rect": {
+                          "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/rect"
+                        },
+                        "style": {
+                          "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/style"
+                        },
+                        "condition": {
+                          "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/condition"
+                        },
+                        "note": {
+                          "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/note"
+                        },
+                        "required": {
+                          "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/required"
+                        },
+                        "pattern": {
+                          "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/pattern"
+                        },
+                        "maxChars": {
+                          "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/maxChars"
+                        },
+                        "group": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "option": {
+                          "type": [
+                            "string",
+                            "number",
+                            "boolean"
+                          ]
+                        },
+                        "binding": {
+                          "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/binding"
+                        },
+                        "mark": {
+                          "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/1/properties/mark",
+                          "default": "check"
+                        },
+                        "markText": {
+                          "type": "string",
+                          "default": "X"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "id",
+                        "rect",
+                        "group",
+                        "option",
+                        "binding"
+                      ],
                       "additionalProperties": false
                     },
                     {
@@ -864,6 +1229,15 @@
                         "note": {
                           "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/note"
                         },
+                        "required": {
+                          "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/required"
+                        },
+                        "pattern": {
+                          "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/pattern"
+                        },
+                        "maxChars": {
+                          "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/0/properties/maxChars"
+                        },
                         "itemsPath": {
                           "type": "string",
                           "minLength": 1
@@ -875,6 +1249,27 @@
                         "maxRows": {
                           "type": "integer",
                           "exclusiveMinimum": 0
+                        },
+                        "overflow": {
+                          "type": "object",
+                          "properties": {
+                            "strategy": {
+                              "type": "string",
+                              "enum": [
+                                "clip",
+                                "paginate",
+                                "statement"
+                              ],
+                              "default": "clip"
+                            },
+                            "statementText": {
+                              "type": "string"
+                            },
+                            "statementFieldId": {
+                              "type": "string"
+                            }
+                          },
+                          "additionalProperties": false
                         },
                         "fields": {
                           "type": "array",
@@ -888,13 +1283,23 @@
                               },
                               {
                                 "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/2"
+                              },
+                              {
+                                "$ref": "#/definitions/FormTemplate/properties/pages/items/properties/fields/items/anyOf/3"
                               }
                             ]
                           },
                           "minItems": 1
                         }
                       },
-                      "required": ["type", "id", "rect", "itemsPath", "rowHeight", "fields"],
+                      "required": [
+                        "type",
+                        "id",
+                        "rect",
+                        "itemsPath",
+                        "rowHeight",
+                        "fields"
+                      ],
                       "additionalProperties": false
                     }
                   ]
@@ -902,10 +1307,38 @@
                 "default": []
               }
             },
-            "required": ["number"],
+            "required": [
+              "number"
+            ],
             "additionalProperties": false
           },
           "minItems": 1
+        },
+        "copies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "title": {
+                "type": "string"
+              },
+              "pageFilter": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                }
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "additionalProperties": false
+          }
         },
         "metadata": {
           "type": "object",
@@ -931,9 +1364,38 @@
           },
           "additionalProperties": false
         },
-        "sampleData": {}
+        "sampleData": {},
+        "fixtures": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1
+              },
+              "data": {}
+            },
+            "required": [
+              "id",
+              "title"
+            ],
+            "additionalProperties": false
+          }
+        }
       },
-      "required": ["specVersion", "id", "title", "form", "medium", "pages"],
+      "required": [
+        "specVersion",
+        "id",
+        "title",
+        "form",
+        "medium",
+        "pages"
+      ],
       "additionalProperties": false
     }
   }

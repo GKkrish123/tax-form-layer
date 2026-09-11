@@ -21,7 +21,13 @@ function isImageUrl(url: string): boolean {
   return /\.(png|jpe?g|gif|webp)$/i.test(url);
 }
 
-export function FormCanvas() {
+export function FormCanvas({
+  forceMode,
+  compact = false,
+}: {
+  forceMode?: 'edit' | 'preview';
+  compact?: boolean;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const displayWidthRef = useRef(0);
@@ -30,22 +36,33 @@ export function FormCanvas() {
   const pdfCache = useRef<{ url: string; doc: any } | null>(null);
 
   const baseDocUrl = useEditor((s) => s.baseDocUrl);
-  const activePage = useEditor((s) => s.activePage);
-  const mode = useEditor((s) => s.mode);
+  const storeMode = useEditor((s) => s.mode);
+  const mode = forceMode ?? (storeMode === 'split' ? 'edit' : storeMode);
   const aiBusy = useEditor((s) => s.aiBusy);
+  const viewportZoom = useEditor((s) => s.viewportZoom);
+  const panX = useEditor((s) => s.panX);
+  const panY = useEditor((s) => s.panY);
   const pageWidth = useEditor((s) => {
     const page = s.template.pages.find((p) => p.number === s.activePage);
     return (page?.size ?? s.template.pageSize).width;
+  });
+  const pdfPage = useEditor((s) => {
+    const page = s.template.pages.find((p) => p.number === s.activePage);
+    const ref = page?.backgroundRef;
+    return typeof ref === 'number' ? ref + 1 : s.activePage;
   });
 
   const [geom, setGeom] = useState<CanvasGeometry | null>(null);
   const [scale, setScale] = useState(1);
   const [error, setError] = useState<string | null>(null);
+  const [spaceDown, setSpaceDown] = useState(false);
+  const panDrag = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
+  const scrollerRef = useRef<HTMLDivElement>(null);
 
   const baseDocUrlRef = useRef(baseDocUrl);
   baseDocUrlRef.current = baseDocUrl;
-  const activePageRef = useRef(activePage);
-  activePageRef.current = activePage;
+  const pdfPageRef = useRef(pdfPage);
+  pdfPageRef.current = pdfPage;
   useEffect(() => {
     registerSnapshotProvider(async () => {
       const url = baseDocUrlRef.current;
@@ -71,7 +88,7 @@ export function FormCanvas() {
       const doc = pdfCache.current?.url === url ? pdfCache.current.doc : null;
       if (!doc) return null;
 
-      const page = await doc.getPage(Math.min(activePageRef.current, doc.numPages));
+      const page = await doc.getPage(Math.min(pdfPageRef.current, doc.numPages));
       const base = page.getViewport({ scale: 1 });
       const vp = page.getViewport({ scale: CAPTURE_WIDTH / base.width });
       const off = document.createElement('canvas');
@@ -86,6 +103,37 @@ export function FormCanvas() {
     });
 
     return () => registerSnapshotProvider(null);
+  }, []);
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.code === 'Space' && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) {
+        e.preventDefault();
+        setSpaceDown(true);
+      }
+    }
+    function onKeyUp(e: KeyboardEvent) {
+      if (e.code === 'Space') setSpaceDown(false);
+    }
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
+  }, []);
+
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      const z = useEditor.getState().viewportZoom;
+      useEditor.getState().setViewportZoom(z * (e.deltaY < 0 ? 1.08 : 1 / 1.08));
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
   }, []);
 
   useEffect(() => {
@@ -165,7 +213,7 @@ export function FormCanvas() {
         pdfCache.current = { url, doc };
       }
 
-      const pageIndex = Math.min(activePage, doc.numPages);
+      const pageIndex = Math.min(Math.max(1, pdfPage), doc.numPages);
       const page = await doc.getPage(pageIndex);
       if (cancelled || gen !== renderGen.current) return;
 
@@ -226,11 +274,41 @@ export function FormCanvas() {
         /* ignore */
       }
     };
-  }, [baseDocUrl, activePage, pageWidth]);
+  }, [baseDocUrl, pdfPage, pageWidth]);
 
   return (
-    <div className="flex h-full justify-center overflow-auto p-3 [scrollbar-gutter:stable] sm:p-5 lg:p-8">
-      <div ref={frameRef} className="w-full max-w-[920px]">
+    <div
+      ref={scrollerRef}
+      className={
+        compact
+          ? 'flex h-full justify-center overflow-auto p-2 [scrollbar-gutter:stable] lg:p-6'
+          : 'flex h-full justify-center overflow-auto p-3 [scrollbar-gutter:stable] sm:p-5 lg:p-8'
+      }
+      style={{ cursor: spaceDown ? 'grab' : undefined }}
+      onPointerDown={(e) => {
+        if (!spaceDown) return;
+        panDrag.current = {
+          x: e.clientX,
+          y: e.clientY,
+          panX: useEditor.getState().panX,
+          panY: useEditor.getState().panY,
+        };
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      }}
+      onPointerMove={(e) => {
+        if (!panDrag.current) return;
+        const st = panDrag.current;
+        useEditor.getState().setPan(st.panX + (e.clientX - st.x), st.panY + (e.clientY - st.y));
+      }}
+      onPointerUp={() => {
+        panDrag.current = null;
+      }}
+    >
+      <div
+        ref={frameRef}
+        className="w-full max-w-[920px]"
+        style={{ transform: `translate(${panX}px, ${panY}px) scale(${viewportZoom})`, transformOrigin: 'top center' }}
+      >
         <div
           className="relative overflow-hidden rounded-lg bg-white shadow-panel ring-1 ring-slate-200"
           style={{ width: '100%', height: geom ? geom.height * scale : undefined }}

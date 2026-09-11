@@ -1,4 +1,4 @@
-# Tax Form Annotation Specification — v1.0.0
+# Tax Form Annotation Specification — v1.1.0
 
 A **medium-agnostic** data structure for annotating the fields/boxes of U.S. tax
 forms, so that any application can pair the annotation with a taxpayer data set and
@@ -10,7 +10,7 @@ any resolution.
 - **TypeScript types:** derived from the schemas via `z.infer`.
 - **JSON Schema:** generated to [`generated/annotation.schema.json`](./generated/annotation.schema.json)
   via `pnpm --filter @tax-form-layer/spec schema:gen`.
-- **Worked example:** [`examples/w2-2024.annotation.json`](./examples/w2-2024.annotation.json).
+- **Worked examples:** [`w2-2024`](./examples/w2-2024.annotation.json), [`w4-2024`](./examples/w4-2024.annotation.json), [`w9-2024`](./examples/w9-2024.annotation.json), [`1099-nec-2024`](./examples/1099-nec-2024.annotation.json), [`1099-int-2024`](./examples/1099-int-2024.annotation.json), [`1099-misc-2024`](./examples/1099-misc-2024.annotation.json).
 
 ---
 
@@ -45,8 +45,10 @@ FormTemplate
 ├─ pages[]
 │   ├─ number, size?, backgroundRef?
 │   └─ fields[]       ← the annotations
+├─ copies[]?          same fields, N titled copies in one plan
 ├─ metadata?          author, description, tags, timestamps
-└─ sampleData?        example data set (documentary / editor preview)
+├─ sampleData?        example data set (documentary / editor preview)
+└─ fixtures[]?        named datasets (Complete / Incomplete / Overflow)
 ```
 
 A **field** is a discriminated union on `type`:
@@ -55,11 +57,13 @@ A **field** is a discriminated union on `type`:
 | ---------- | --------------------------------------------------- |
 | `value`    | A single scalar drawn as text (the workhorse).      |
 | `checkbox` | A mark drawn when a bound value is truthy.          |
+| `radio`    | A mark drawn when the bound value equals `option` (mutually exclusive within `group`). |
 | `comb`     | One character per cell (SSN/EIN/money comb boxes).  |
 | `repeat`   | A group stamped once per element of a bound array.  |
 
 Every field shares: `id`, optional `label`/`boxNumber`, a `rect`, optional `style`,
-an optional render `condition`, and an optional author `note`.
+an optional render `condition`, optional author `note`, and optional constraints
+(`required`, `pattern`, `maxChars`).
 
 ---
 
@@ -102,6 +106,18 @@ The `binding` declares where a field's value comes from:
 // Template — compose multiple refs into one string
 { "source": "template",
   "template": "{$.employee.firstName} {$.employee.lastName}" }
+
+// Computed — AST arithmetic / branching (never eval)
+{ "source": "computed", "op": "sum",
+  "args": [
+    { "source": "jsonpath", "path": "$.boxes.box1" },
+    { "source": "jsonpath", "path": "$.boxes.box8" }
+  ] }
+
+{ "source": "computed", "op": "if",
+  "condition": { "path": "$.filingStatus", "operator": "eq", "value": "MFJ" },
+  "then": { "source": "jsonpath", "path": "$.spouse.ssn" },
+  "else": { "source": "const", "value": "" } }
 ```
 
 Optional on every binding:
@@ -160,14 +176,23 @@ Omitted properties fall back to spec defaults, so minimal annotations stay terse
 
 ## 7. Conditions
 
-A field may declare a render `condition`; when false, the field is skipped:
+A field may declare a render `condition`; when false, the field is skipped.
+Leaves are the 1.0 predicate. Compound `all` / `any` / `not` express skip logic:
 
 ```jsonc
 "condition": { "path": "$.filingStatus", "operator": "eq", "value": "MFJ" }
+
+"condition": {
+  "all": [
+    { "path": "$.filingStatus", "operator": "eq", "value": "MFJ" },
+    { "path": "$.spouse.ssn", "operator": "exists" }
+  ]
+}
+
+"condition": { "not": { "path": "$.deceased", "operator": "truthy" } }
 ```
 
-Operators: `exists`, `notExists`, `truthy`, `falsy`, `eq`, `ne`, `gt`, `lt`, `gte`,
-`lte`.
+Leaf operators: `exists`, `notExists`, `truthy`, `falsy`, `eq`, `ne`, `gt`, `lt`, `gte`, `lte`.
 
 ---
 
@@ -178,16 +203,58 @@ Operators: `exists`, `notExists`, `truthy`, `falsy`, `eq`, `ne`, `gt`, `lt`, `gt
   "type": "repeat",
   "id": "state_rows",
   "rect": { "x": 0.05, "y": 0.85, "width": 0.9, "height": 0.03 },
-  "itemsPath": "$.state",   // array to iterate
-  "rowHeight": 0.035,        // downward offset per row (group's unit)
+  "itemsPath": "$.state",
+  "rowHeight": 0.035,
   "maxRows": 2,
+  "overflow": { "strategy": "statement", "statementText": "See attached", "statementFieldId": "state_see_stmt" },
   "fields": [ /* child fields; rects relative to group, bindings use @ */ ]
 }
 ```
 
+Repeat overflow:
+
+- `clip` *(default)* — emit at most `maxRows`.
+- `paginate` — extra plan pages clone the group's geometry for leftover rows.
+- `statement` — fill `maxRows`, write `statementText` onto `statementFieldId`, diagnose leftover count.
+
 ---
 
-## 9. Validation & versioning
+## 9. Copies
+
+Optional `copies` print the same annotation as a pack (W-2 Copy A/B/C):
+
+```jsonc
+"copies": [
+  { "id": "B", "title": "Copy B — To Be Filed With Employee's FEDERAL Tax Return", "pageFilter": [1] },
+  { "id": "C", "title": "Copy C — For EMPLOYEE'S RECORDS", "pageFilter": [1] }
+]
+```
+
+The engine prefixes draw-op `fieldId` with `copyId`. Omit `copies` to plan a single unlabeled copy.
+
+---
+
+## 10. Diagnostics
+
+Issues are part of the spec so studio and CI share codes:
+
+| Code | Meaning |
+| ---- | ------- |
+| `TFL-BIND-001` | Unbound path (`$.` / `@.`) |
+| `TFL-BIND-002` | Missing value (empty, no fallback) |
+| `TFL-BIND-003` | Type mismatch (e.g. `sum` of a string) |
+| `TFL-OVR-001` | Text overflow at `minFontSize` |
+| `TFL-OVR-002` | Comb truncated |
+| `TFL-OVR-003` | Repeat overflow |
+| `TFL-CON-001` | Constraint failed (`required` / `pattern` / `maxChars`) |
+
+Shape: `{ code, severity, fieldId?, path?, message, data? }`.
+
+The engine's `compileTemplate` returns `{ plan, issues, coverage }` plus helpers `collectPaths`, `coverage`, `toDataJsonSchema`.
+
+---
+
+## 11. Validation & versioning
 
 - `parseTemplate(input)` returns a discriminated result `{ ok, template, migrated }`
   or `{ ok: false, errors[] }` with dotted paths — never throws.
@@ -198,11 +265,11 @@ Operators: `exists`, `notExists`, `truthy`, `falsy`, `eq`, `ne`, `gt`, `lt`, `gt
 
 ---
 
-## 10. Consuming the spec (third-party integration)
+## 12. Consuming the spec (third-party integration)
 
 ```ts
 import { parseTemplate } from '@tax-form-layer/spec';
-import { planTemplate } from '@tax-form-layer/engine';
+import { planTemplate, compileTemplate } from '@tax-form-layer/engine';
 import { renderPdf } from '@tax-form-layer/engine/pdf';
 
 const { ok, template } = parseTemplate(annotationJson);

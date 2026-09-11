@@ -1,0 +1,133 @@
+{
+  "specVersion": "1.1.0",
+  "id": "irs-1099-misc-2024",
+  "title": "IRS Form 1099-MISC (2024) — Miscellaneous Information",
+  "templateVersion": "1.0.0",
+  "form": {
+    "jurisdiction": "US-IRS",
+    "formNumber": "1099-MISC",
+    "taxYear": 2024,
+    "edition": "2024"
+  },
+  "medium": {
+    "kind": "pdf",
+    "source": "/forms/1099-misc-2024.pdf",
+    "dpi": 150
+  },
+  "pageSize": { "width": 612, "height": 792 },
+  "metadata": {
+    "author": "tax-form-layer",
+    "description": "1099-MISC: rents, royalties, other income, withheld tax, 2nd TIN checkbox.",
+    "tags": ["1099", "misc", "reference"]
+  },
+  "pages": [
+    {
+      "number": 1,
+      "backgroundRef": 0,
+      "fields": [
+        {
+          "type": "value",
+          "id": "payer_block",
+          "label": "PAYER'S name, address, TIN",
+          "rect": { "x": 0.05, "y": 0.08, "width": 0.48, "height": 0.12 },
+          "binding": {
+            "source": "template",
+            "template": "{$.payer.name}\n{$.payer.address}\nTIN {$.payer.tin}"
+          },
+          "format": { "type": "text" },
+          "style": { "fontSize": 9, "verticalAlign": "top", "overflow": "wrap" }
+        },
+        {
+          "type": "comb",
+          "id": "recipient_tin",
+          "label": "RECIPIENT'S TIN",
+          "rect": { "x": 0.56, "y": 0.08, "width": 0.38, "height": 0.03 },
+          "binding": { "source": "jsonpath", "path": "$.recipient.tin" },
+          "format": { "type": "ein" },
+          "cells": 10,
+          "cellGap": 0.08,
+          "alignRight": false,
+          "style": { "fontSize": 11, "align": "center" }
+        },
+        {
+          "type": "value",
+          "id": "recipient_name",
+          "label": "RECIPIENT'S name",
+          "rect": { "x": 0.05, "y": 0.24, "width": 0.48, "height": 0.04 },
+          "binding": { "source": "jsonpath", "path": "$.recipient.name" },
+          "format": { "type": "text", "case": "upper" },
+          "style": { "fontSize": 10 }
+        },
+        {
+          "type": "value",
+          "id": "box1_rents",
+          "label": "1 — Rents",
+          "boxNumber": "1",
+          "rect": { "x": 0.56, "y": 0.16, "width": 0.38, "height": 0.035 },
+          "binding": { "source": "jsonpath", "path": "$.amounts.rents", "fallback": 0 },
+          "format": { "type": "currency" },
+          "style": { "align": "right", "fontSize": 10 }
+        },
+        {
+          "type": "value",
+          "id": "box2_royalties",
+          "label": "2 — Royalties",
+          "boxNumber": "2",
+          "rect": { "x": 0.56, "y": 0.22, "width": 0.38, "height": 0.035 },
+          "binding": { "source": "jsonpath", "path": "$.amounts.royalties", "fallback": 0 },
+          "format": { "type": "currency" },
+          "style": { "align": "right", "fontSize": 10 }
+        },
+        {
+          "type": "value",
+          "id": "box3_other",
+          "label": "3 — Other income",
+          "boxNumber": "3",
+          "rect": { "x": 0.56, "y": 0.28, "width": 0.38, "height": 0.035 },
+          "binding": { "source": "jsonpath", "path": "$.amounts.other", "fallback": 0 },
+          "format": { "type": "currency" },
+          "style": { "align": "right", "fontSize": 10 }
+        },
+        {
+          "type": "value",
+          "id": "box4_withheld",
+          "label": "4 — Federal income tax withheld",
+          "boxNumber": "4",
+          "rect": { "x": 0.56, "y": 0.34, "width": 0.38, "height": 0.035 },
+          "binding": { "source": "jsonpath", "path": "$.amounts.federalWithheld", "fallback": 0 },
+          "format": { "type": "currency" },
+          "style": { "align": "right", "fontSize": 10 }
+        },
+        {
+          "type": "checkbox",
+          "id": "second_tin",
+          "label": "2nd TIN not.",
+          "rect": { "x": 0.56, "y": 0.42, "width": 0.02, "height": 0.02 },
+          "binding": { "source": "jsonpath", "path": "$.flags.secondTinNotice" },
+          "mark": "text",
+          "markText": "X"
+        }
+      ]
+    }
+  ],
+  "sampleData": {
+    "payer": {
+      "name": "Harbor Property Group",
+      "address": "400 Pier Street, Seattle, WA 98101",
+      "tin": "911223344"
+    },
+    "recipient": {
+      "name": "Ortega Holdings LLC",
+      "tin": "561112233"
+    },
+    "amounts": {
+      "rents": 18000,
+      "royalties": 0,
+      "other": 450,
+      "federalWithheld": 0
+    },
+    "flags": {
+      "secondTinNotice": false
+    }
+  }
+}

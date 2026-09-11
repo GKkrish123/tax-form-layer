@@ -10,7 +10,13 @@ export interface Migration {
  * When a breaking change ships, append a migration here, e.g.:
  *   { from: '1.0.0', to: '1.1.0', migrate: (doc) => ({ ...doc, specVersion: '1.1.0', ... }) }
  */
-export const MIGRATIONS: readonly Migration[] = [];
+export const MIGRATIONS: readonly Migration[] = [
+  {
+    from: '1.0.0',
+    to: '1.1.0',
+    migrate: (doc) => ({ ...doc, specVersion: '1.1.0' }),
+  },
+];
 
 export const KNOWN_SPEC_VERSIONS: readonly string[] = [
   SPEC_VERSION,

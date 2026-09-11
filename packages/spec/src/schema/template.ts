@@ -52,6 +52,24 @@ export const TemplateMetadata = z
   .strict();
 export type TemplateMetadata = z.infer<typeof TemplateMetadata>;
 
+export const FormCopy = z
+  .object({
+    id: z.string().min(1),
+    title: z.string().optional(),
+    pageFilter: z.array(z.number().int().positive()).optional(),
+  })
+  .strict();
+export type FormCopy = z.infer<typeof FormCopy>;
+
+export const DataFixture = z
+  .object({
+    id: z.string().min(1),
+    title: z.string().min(1),
+    data: z.unknown(),
+  })
+  .strict();
+export type DataFixture = z.infer<typeof DataFixture>;
+
 export const FormTemplate = z
   .object({
     specVersion: z.string().min(1),
@@ -62,8 +80,10 @@ export const FormTemplate = z
     medium: Medium,
     pageSize: PageSize.default({ width: 612, height: 792 }),
     pages: z.array(Page).min(1),
+    copies: z.array(FormCopy).optional(),
     metadata: TemplateMetadata.optional(),
     sampleData: z.unknown().optional(),
+    fixtures: z.array(DataFixture).optional(),
   })
   .strict();
 export type FormTemplate = z.infer<typeof FormTemplate>;

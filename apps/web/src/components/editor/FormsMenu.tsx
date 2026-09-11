@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { ChevronDown, FilePlus2, FileText, FolderOpen, Loader2 } from 'lucide-react';
 import { parseTemplate } from '@tax-form-layer/spec';
+import { confirmDiscard } from '@/lib/unsaved';
 import { useEditor } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { NewFormDialog } from './NewFormDialog';
+import { BUNDLED_EXAMPLES, parseBundledExample } from '@/lib/examples';
 
 interface StoredTemplate {
   slug: string;
@@ -50,6 +52,7 @@ export function FormsMenu() {
   }, [load]);
 
   async function openTemplate(slug: string) {
+    if (!confirmDiscard(useEditor.getState().dirty)) return;
     const gen = ++openGen.current;
     setPendingSlug(slug);
     const toastId = 'open-form';
@@ -75,18 +78,45 @@ export function FormsMenu() {
     }
   }
 
+  function openExample(id: string) {
+    if (!confirmDiscard(useEditor.getState().dirty)) return;
+    const example = BUNDLED_EXAMPLES.find((e) => e.id === id);
+    if (!example) return;
+    try {
+      const template = parseBundledExample(example);
+      loadTemplate(template, { dirty: false });
+      toast.success('Opened example', { description: template.title });
+    } catch (err) {
+      toast.error('Could not open example', {
+        description: err instanceof Error ? err.message : undefined,
+      });
+    }
+  }
+
   return (
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm">
-            <FolderOpen /> <span className="hidden sm:inline">Forms</span> <ChevronDown className="opacity-60" />
+          <Button variant="outline" size="sm" aria-label="Forms">
+            <FolderOpen /> <span className="hidden lg:inline">Forms</span>{' '}
+            <ChevronDown className="hidden opacity-60 lg:inline" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-64">
           <DropdownMenuItem onSelect={() => setNewOpen(true)}>
             <FilePlus2 /> New form…
           </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel>Examples</DropdownMenuLabel>
+          {BUNDLED_EXAMPLES.map((ex) => (
+            <DropdownMenuItem key={ex.id} onSelect={() => openExample(ex.id)}>
+              <FileText />
+              <span className="truncate">{ex.formNumber}</span>
+              {ex.id === currentId && (
+                <span className="ml-auto text-[10px] text-primary">current</span>
+              )}
+            </DropdownMenuItem>
+          ))}
           <DropdownMenuSeparator />
           <DropdownMenuLabel>Saved forms</DropdownMenuLabel>
           {templates.length === 0 && (
