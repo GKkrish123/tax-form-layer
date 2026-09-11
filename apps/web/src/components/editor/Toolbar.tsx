@@ -1,12 +1,13 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
   Boxes,
   Check,
   Download,
   FileDown,
+  Loader2,
   PanelLeft,
   PanelRight,
   Plus,
@@ -105,7 +106,10 @@ export function Toolbar({ onToggleLeft, onToggleRight, leftOpen, rightOpen }: To
   const setTitle = useEditor((s) => s.setTitle);
   const addField = useEditor((s) => s.addField);
   const dirty = useEditor((s) => s.dirty);
+  const currentId = useEditor((s) => s.template.id);
   const fileRef = useRef<HTMLInputElement>(null);
+  const inflightSaves = useRef(new Set<string>());
+  const [savingId, setSavingId] = useState<string | null>(null);
 
   function validate() {
     const { template } = useEditor.getState();
@@ -163,17 +167,52 @@ export function Toolbar({ onToggleLeft, onToggleRight, leftOpen, rightOpen }: To
   }
 
   async function saveVersion() {
-    const { template, markSaved } = useEditor.getState();
-    const res = await fetch('/api/templates', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ template }),
-    });
-    if (!res.ok) return toast.error('Save failed');
-    const json = (await res.json()) as { version: number };
-    markSaved();
-    toast.success(`Saved version ${json.version}`);
-    window.dispatchEvent(new CustomEvent('templates:changed'));
+    const { template, revision, markSaved } = useEditor.getState();
+    if (inflightSaves.current.has(template.id)) return;
+
+    inflightSaves.current.add(template.id);
+    setSavingId(template.id);
+    const toastId = toast.loading('Saving…');
+    try {
+      const res = await fetch('/api/templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ template }),
+      });
+      const json = (await res.json().catch(() => ({}))) as { version?: number; error?: string };
+      if (!res.ok) {
+        toast.error('Save failed', {
+          id: toastId,
+          description: json.error,
+          duration: 8000,
+          action: {
+            label: 'Retry',
+            onClick: () => {
+              void saveVersion();
+            },
+          },
+        });
+        return;
+      }
+      markSaved({ id: template.id, revision });
+      toast.success(`Saved version ${json.version}`, { id: toastId });
+      window.dispatchEvent(new CustomEvent('templates:changed'));
+    } catch (err) {
+      toast.error('Save failed', {
+        id: toastId,
+        description: err instanceof Error ? err.message : undefined,
+        duration: 8000,
+        action: {
+          label: 'Retry',
+          onClick: () => {
+            void saveVersion();
+          },
+        },
+      });
+    } finally {
+      inflightSaves.current.delete(template.id);
+      setSavingId((id) => (id === template.id ? null : id));
+    }
   }
 
   return (
@@ -254,8 +293,13 @@ export function Toolbar({ onToggleLeft, onToggleRight, leftOpen, rightOpen }: To
         <ActionButton label="Download filled PDF" onClick={downloadPdf}>
           <FileDown /> <span className="hidden sm:inline">PDF</span>
         </ActionButton>
-        <Button size="sm" onClick={saveVersion}>
-          <Save /> <span className="hidden sm:inline">Save</span>
+        <Button
+          size="sm"
+          onClick={() => void saveVersion()}
+          disabled={savingId === currentId}
+        >
+          {savingId === currentId ? <Loader2 className="animate-spin" /> : <Save />}
+          <span className="hidden sm:inline">{savingId === currentId ? 'Saving…' : 'Save'}</span>
         </Button>
 
         <IconToggle

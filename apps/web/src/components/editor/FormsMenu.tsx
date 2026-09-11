@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { ChevronDown, FilePlus2, FileText, FolderOpen } from 'lucide-react';
+import { ChevronDown, FilePlus2, FileText, FolderOpen, Loader2 } from 'lucide-react';
 import { parseTemplate } from '@tax-form-layer/spec';
 import { useEditor } from '@/lib/store';
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,8 @@ export function FormsMenu() {
   const currentId = useEditor((s) => s.template.id);
   const [templates, setTemplates] = useState<StoredTemplate[]>([]);
   const [newOpen, setNewOpen] = useState(false);
+  const [pendingSlug, setPendingSlug] = useState<string | null>(null);
+  const openGen = useRef(0);
 
   const load = useCallback(async () => {
     try {
@@ -48,18 +50,28 @@ export function FormsMenu() {
   }, [load]);
 
   async function openTemplate(slug: string) {
+    const gen = ++openGen.current;
+    setPendingSlug(slug);
+    const toastId = 'open-form';
+    toast.loading('Opening form…', { id: toastId });
     try {
       const res = await fetch(`/api/templates/${encodeURIComponent(slug)}`);
+      if (gen !== openGen.current) return;
       if (!res.ok) throw new Error('Not found');
       const json = (await res.json()) as { document: unknown };
+      if (gen !== openGen.current) return;
       const parsed = parseTemplate(json.document);
       if (!parsed.ok) throw new Error(parsed.errors[0]?.message ?? 'Invalid template');
       loadTemplate(parsed.template, { dirty: false });
-      toast.success('Opened form', { description: parsed.template.title });
+      toast.success('Opened form', { id: toastId, description: parsed.template.title });
     } catch (err) {
+      if (gen !== openGen.current) return;
       toast.error('Could not open form', {
+        id: toastId,
         description: err instanceof Error ? err.message : undefined,
       });
+    } finally {
+      if (gen === openGen.current) setPendingSlug(null);
     }
   }
 
@@ -84,9 +96,9 @@ export function FormsMenu() {
           )}
           {templates.map((t) => (
             <DropdownMenuItem key={t.slug} onSelect={() => void openTemplate(t.slug)}>
-              <FileText />
+              {pendingSlug === t.slug ? <Loader2 className="animate-spin" /> : <FileText />}
               <span className="truncate">{t.title}</span>
-              {t.slug === currentId && (
+              {t.slug === currentId && pendingSlug !== t.slug && (
                 <span className="ml-auto text-[10px] text-primary">current</span>
               )}
             </DropdownMenuItem>

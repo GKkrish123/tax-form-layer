@@ -62,6 +62,7 @@ export function AiMenu() {
   }, []);
 
   async function autoDetect() {
+    if (useEditor.getState().aiBusy) return;
     const imageDataUrl = await captureCanvasDataUrl();
     if (!imageDataUrl) {
       toast.error('Open a form first', { description: 'The page must be rendered to scan it.' });
@@ -89,7 +90,17 @@ export function AiMenu() {
       }
       if (!res.ok || !json.fields) throw new Error(json.error ?? 'Detection failed');
       if (json.fields.length === 0) {
-        toast.info('No boxes detected', { id: toastId });
+        toast.info('No boxes detected', {
+          id: toastId,
+          description: 'The model did not find fillable fields on this page.',
+          duration: 10_000,
+          action: {
+            label: 'Retry',
+            onClick: () => {
+              void autoDetect();
+            },
+          },
+        });
         return;
       }
 
@@ -122,9 +133,17 @@ export function AiMenu() {
             : 'Review, bind, and adjust them as needed.',
       });
     } catch (err) {
-      toast.error('Detection failed', {
+      const message = err instanceof Error ? err.message : 'Detection failed';
+      toast.error('AI Detection failed', {
         id: toastId,
-        description: err instanceof Error ? err.message : undefined,
+        description: message,
+        duration: 12_000,
+        action: {
+          label: 'Retry',
+          onClick: () => {
+            void autoDetect();
+          },
+        },
       });
     } finally {
       setAiBusy(null);

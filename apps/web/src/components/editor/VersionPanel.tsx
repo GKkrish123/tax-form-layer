@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { ChevronRight, History, RefreshCw, RotateCcw } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { ChevronRight, History, Loader2, RefreshCw, RotateCcw } from 'lucide-react';
 import { parseTemplate } from '@tax-form-layer/spec';
 import { useEditor } from '@/lib/store';
 import { cn } from '@/lib/utils';
@@ -16,40 +17,76 @@ interface VersionInfo {
 
 export function VersionPanel() {
   const slug = useEditor((s) => s.template.id);
-  const setTemplate = useEditor((s) => s.setTemplate);
+  const docEpoch = useEditor((s) => s.docEpoch);
+  const loadTemplate = useEditor((s) => s.loadTemplate);
   const [versions, setVersions] = useState<VersionInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
+  const [restoring, setRestoring] = useState<number | null>(null);
+  const listGen = useRef(0);
+  const restoreGen = useRef(0);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (requested: string) => {
+    const gen = ++listGen.current;
     setLoading(true);
     try {
-      const res = await fetch(`/api/templates/${encodeURIComponent(slug)}`);
+      const res = await fetch(`/api/templates/${encodeURIComponent(requested)}`);
+      if (gen !== listGen.current) return;
+      if (useEditor.getState().template.id !== requested) return;
       if (res.ok) {
         const json = (await res.json()) as { versions: VersionInfo[] };
         setVersions(json.versions);
       } else {
         setVersions([]);
       }
+    } catch {
+      if (gen !== listGen.current) return;
+      setVersions([]);
     } finally {
-      setLoading(false);
+      if (gen === listGen.current) setLoading(false);
     }
-  }, [slug]);
+  }, []);
 
   useEffect(() => {
+    setVersions([]);
     if (!open) return;
-    void load();
-    const handler = () => void load();
+    void load(slug);
+    const handler = () => void load(useEditor.getState().template.id);
     window.addEventListener('templates:changed', handler);
     return () => window.removeEventListener('templates:changed', handler);
-  }, [load, open]);
+  }, [load, open, slug, docEpoch]);
 
   async function restore(version: number) {
-    const res = await fetch(`/api/templates/${encodeURIComponent(slug)}?version=${version}`);
-    if (!res.ok) return;
-    const json = (await res.json()) as { document: unknown };
-    const parsed = parseTemplate(json.document);
-    if (parsed.ok) setTemplate(parsed.template);
+    const gen = ++restoreGen.current;
+    const requestedSlug = slug;
+    setRestoring(version);
+    const toastId = 'restore-version';
+    toast.loading(`Restoring v${version}…`, { id: toastId });
+    try {
+      const res = await fetch(
+        `/api/templates/${encodeURIComponent(requestedSlug)}?version=${version}`,
+      );
+      if (gen !== restoreGen.current) return;
+      if (!res.ok) throw new Error('Version not found');
+      const json = (await res.json()) as { document: unknown };
+      if (gen !== restoreGen.current) return;
+      const parsed = parseTemplate(json.document);
+      if (!parsed.ok) throw new Error(parsed.errors[0]?.message ?? 'Invalid version');
+      if (useEditor.getState().template.id !== requestedSlug) {
+        toast.dismiss(toastId);
+        return;
+      }
+      loadTemplate(parsed.template, { dirty: true });
+      toast.success(`Restored version ${version}`, { id: toastId });
+    } catch (err) {
+      if (gen !== restoreGen.current) return;
+      toast.error('Could not restore version', {
+        id: toastId,
+        description: err instanceof Error ? err.message : undefined,
+      });
+    } finally {
+      if (gen === restoreGen.current) setRestoring(null);
+    }
   }
 
   return (
@@ -80,7 +117,7 @@ export function VersionPanel() {
             variant="ghost"
             size="sm"
             className="h-7 shrink-0 px-2 text-primary"
-            onClick={() => void load()}
+            onClick={() => void load(slug)}
           >
             <RefreshCw className="h-3 w-3" />
           </Button>
@@ -89,7 +126,9 @@ export function VersionPanel() {
 
       {open && (
         <div className="scroll-slim max-h-40 overflow-auto px-2 pb-3">
-          {loading && <p className="px-2 text-[11px] text-muted-foreground">Loading…</p>}
+          {loading && versions.length === 0 && (
+            <p className="px-2 text-[11px] text-muted-foreground">Loading…</p>
+          )}
           {!loading && versions.length === 0 && (
             <p className="px-2 text-[11px] text-muted-foreground">No saved versions yet.</p>
           )}
@@ -108,7 +147,12 @@ export function VersionPanel() {
                 className="h-6 px-2 text-[10px]"
                 onClick={() => void restore(v.version)}
               >
-                <RotateCcw className="h-3 w-3" /> Restore
+                {restoring === v.version ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <RotateCcw className="h-3 w-3" />
+                )}
+                Restore
               </Button>
             </div>
           ))}

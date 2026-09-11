@@ -75,16 +75,37 @@ export interface StoredTemplate {
   latest: number;
 }
 
-export async function saveTemplateVersion(input: {
+const saveQueues = new Map<string, Promise<unknown>>();
+
+function enqueueSave<T>(slug: string, task: () => Promise<T>): Promise<T> {
+  const prev = saveQueues.get(slug) ?? Promise.resolve();
+  const next = prev.then(task, task);
+  saveQueues.set(
+    slug,
+    next.then(
+      () => undefined,
+      () => undefined,
+    ),
+  );
+  return next;
+}
+
+function isUniqueConflict(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    'code' in err &&
+    (err as { code: string }).code === 'P2002'
+  );
+}
+
+async function persistVersion(input: {
   slug: string;
   title: string;
   specVersion: string;
-  document: unknown;
+  documentText: string;
   message?: string;
 }): Promise<{ template: StoredTemplate; version: number }> {
-  await ready();
-  const documentText = JSON.stringify(input.document);
-
   const existing = await prisma.template.findUnique({ where: { slug: input.slug } });
 
   if (!existing) {
@@ -97,7 +118,7 @@ export async function saveTemplateVersion(input: {
           create: {
             version: 1,
             specVersion: input.specVersion,
-            document: documentText,
+            document: input.documentText,
             message: input.message ?? 'Initial version',
           },
         },
@@ -114,14 +135,19 @@ export async function saveTemplateVersion(input: {
     };
   }
 
-  const nextVersion = existing.latest + 1;
+  const maxRow = await prisma.templateVersion.aggregate({
+    where: { templateId: existing.id },
+    _max: { version: true },
+  });
+  const nextVersion = Math.max(existing.latest, maxRow._max.version ?? 0) + 1;
+
   await prisma.$transaction([
     prisma.templateVersion.create({
       data: {
         templateId: existing.id,
         version: nextVersion,
         specVersion: input.specVersion,
-        document: documentText,
+        document: input.documentText,
         message: input.message ?? null,
       },
     }),
@@ -135,6 +161,39 @@ export async function saveTemplateVersion(input: {
     template: { id: existing.id, slug: existing.slug, title: input.title, latest: nextVersion },
     version: nextVersion,
   };
+}
+
+export async function saveTemplateVersion(input: {
+  slug: string;
+  title: string;
+  specVersion: string;
+  document: unknown;
+  message?: string;
+}): Promise<{ template: StoredTemplate; version: number }> {
+  await ready();
+  const documentText = JSON.stringify(input.document);
+
+  return enqueueSave(input.slug, async () => {
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < 8; attempt++) {
+      try {
+        return await persistVersion({
+          slug: input.slug,
+          title: input.title,
+          specVersion: input.specVersion,
+          documentText,
+          ...(input.message ? { message: input.message } : {}),
+        });
+      } catch (err) {
+        lastErr = err;
+        if (!isUniqueConflict(err) && !(err instanceof Error && /unique/i.test(err.message))) {
+          throw err;
+        }
+        await new Promise((r) => setTimeout(r, 15 * (attempt + 1)));
+      }
+    }
+    throw lastErr instanceof Error ? lastErr : new Error('Could not save version');
+  });
 }
 
 export async function listTemplates(): Promise<StoredTemplate[]> {

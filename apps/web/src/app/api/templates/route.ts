@@ -27,13 +27,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid template', issues: parsed.errors }, { status: 422 });
   }
 
-  const saved = await saveTemplateVersion({
-    slug: parsed.template.id,
-    title: parsed.template.title,
-    specVersion: parsed.template.specVersion,
-    document: parsed.template,
-    ...(body.message ? { message: body.message } : {}),
-  });
-
-  return NextResponse.json(saved, { status: 201 });
+  try {
+    const saved = await saveTemplateVersion({
+      slug: parsed.template.id,
+      title: parsed.template.title,
+      specVersion: parsed.template.specVersion,
+      document: parsed.template,
+      ...(body.message ? { message: body.message } : {}),
+    });
+    return NextResponse.json(saved, { status: 201 });
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Save failed' },
+      { status: 500 },
+    );
+  }
 }

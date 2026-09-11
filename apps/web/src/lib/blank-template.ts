@@ -17,7 +17,8 @@ function slugify(value: string): string {
 }
 
 export function blankTemplate(input: NewFormInput): FormTemplate {
-  const id = slugify(`${input.jurisdiction}-${input.formNumber}-${input.taxYear}`) || `form-${Date.now()}`;
+  const base = slugify(`${input.jurisdiction}-${input.formNumber}-${input.taxYear}`) || 'form';
+  const id = `${base}-${Date.now().toString(36)}`;
   const draft = {
     specVersion: SPEC_VERSION,
     id,

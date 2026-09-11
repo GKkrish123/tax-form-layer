@@ -23,6 +23,8 @@ interface EditorState {
   mode: EditorMode;
   baseDocUrl: string;
   dirty: boolean;
+  revision: number;
+  docEpoch: number;
   aiBusy: AiBusyKind;
 
   setMode: (mode: EditorMode) => void;
@@ -40,7 +42,7 @@ interface EditorState {
   addFields: (fields: Field[]) => void;
   updateActivePageFields: (updater: (fields: Field[]) => Field[]) => void;
   removeField: (id: string) => void;
-  markSaved: () => void;
+  markSaved: (opts: { id: string; revision: number }) => void;
 }
 
 const FALLBACK_BASE = '/forms/w2-2024.pdf';
@@ -62,7 +64,7 @@ function replaceField(template: FormTemplate, pageNumber: number, id: string, ne
   };
 }
 
-export const useEditor = create<EditorState>((set, get) => ({
+export const useEditor = create<EditorState>((set) => ({
   template: initialTemplate,
   data: initialTemplate.sampleData ?? {},
   activePage: 1,
@@ -70,6 +72,8 @@ export const useEditor = create<EditorState>((set, get) => ({
   mode: 'edit',
   baseDocUrl: baseUrlOf(initialTemplate),
   dirty: false,
+  revision: 0,
+  docEpoch: 0,
   aiBusy: null,
 
   setMode: (mode) => set({ mode }),
@@ -79,24 +83,29 @@ export const useEditor = create<EditorState>((set, get) => ({
   setData: (data) => set({ data }),
   setBaseDocUrl: (baseDocUrl) => set({ baseDocUrl }),
   setTemplate: (template) =>
-    set({
+    set((s) => ({
       template,
-      data: (template as { sampleData?: unknown }).sampleData ?? get().data,
+      data: (template as { sampleData?: unknown }).sampleData ?? s.data,
       baseDocUrl: baseUrlOf(template),
       selectedFieldId: null,
       activePage: 1,
       dirty: true,
-    }),
+      revision: s.revision + 1,
+      docEpoch: s.docEpoch + 1,
+    })),
   loadTemplate: (template, opts) =>
-    set({
+    set((s) => ({
       template,
       data: (template as { sampleData?: unknown }).sampleData ?? {},
       baseDocUrl: baseUrlOf(template),
       selectedFieldId: null,
       activePage: 1,
       dirty: opts?.dirty ?? false,
-    }),
-  setTitle: (title) => set((s) => ({ template: { ...s.template, title }, dirty: true })),
+      revision: s.revision + 1,
+      docEpoch: s.docEpoch + 1,
+    })),
+  setTitle: (title) =>
+    set((s) => ({ template: { ...s.template, title }, dirty: true, revision: s.revision + 1 })),
 
   updateField: (id, patch) =>
     set((s) => {
@@ -112,6 +121,7 @@ export const useEditor = create<EditorState>((set, get) => ({
         template: replaceField(s.template, s.activePage, id, next),
         selectedFieldId: renamed,
         dirty: true,
+        revision: s.revision + 1,
       };
     }),
 
@@ -121,7 +131,11 @@ export const useEditor = create<EditorState>((set, get) => ({
       const existing = page?.fields.find((f) => f.id === id);
       if (!existing) return s;
       const next = { ...existing, rect: { ...existing.rect, ...rect } } as Field;
-      return { template: replaceField(s.template, s.activePage, id, next), dirty: true };
+      return {
+        template: replaceField(s.template, s.activePage, id, next),
+        dirty: true,
+        revision: s.revision + 1,
+      };
     }),
 
   addField: (field) =>
@@ -134,6 +148,7 @@ export const useEditor = create<EditorState>((set, get) => ({
       },
       selectedFieldId: field.id,
       dirty: true,
+      revision: s.revision + 1,
     })),
 
   addFields: (fields) =>
@@ -145,6 +160,7 @@ export const useEditor = create<EditorState>((set, get) => ({
         ),
       },
       dirty: true,
+      revision: s.revision + 1,
     })),
 
   updateActivePageFields: (updater) =>
@@ -156,6 +172,7 @@ export const useEditor = create<EditorState>((set, get) => ({
         ),
       },
       dirty: true,
+      revision: s.revision + 1,
     })),
 
   removeField: (id) =>
@@ -163,7 +180,11 @@ export const useEditor = create<EditorState>((set, get) => ({
       template: replaceField(s.template, s.activePage, id, null),
       selectedFieldId: s.selectedFieldId === id ? null : s.selectedFieldId,
       dirty: true,
+      revision: s.revision + 1,
     })),
 
-  markSaved: () => set({ dirty: false }),
+  markSaved: ({ id, revision }) =>
+    set((s) =>
+      s.template.id === id && s.revision === revision ? { dirty: false } : s,
+    ),
 }));
